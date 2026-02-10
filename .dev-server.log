@@ -1,0 +1,16 @@
+
+> formulite-landing@0.1.0 dev
+> next dev
+
+   ▲ Next.js 16.0.10 (Turbopack)
+   - Local:         http://localhost:3000
+   - Network:       http://192.168.0.53:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 411ms
+ ⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /login 200 in 1547ms (compile: 1409ms, render: 138ms)
+[email] persisted sent email to /var/folders/gh/4znr0ghx0h5bstzcsc3y548c0000gn/T/formulite-sent-emails.log
+✅ Password change notification sent to: kinn@kinn.kr
+ POST /api/auth/password-changed 200 in 766ms (compile: 325ms, render: 441ms)
