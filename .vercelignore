@@ -1,0 +1,5 @@
+node_modules
+.next
+.git
+NovaAI_Setup_1.0.0.exe
+*.log
