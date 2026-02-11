@@ -6,6 +6,7 @@ import {
     updateDoc,
 } from "firebase/firestore";
 import { getFirebaseApp } from "../firebaseConfig";
+import { buildUserRootPatch, sanitizeForFirestore } from "@/lib/userData";
 
 function getDb() {
     return getFirestore(getFirebaseApp());
@@ -29,23 +30,11 @@ export interface SubscriptionData {
     amount?: number;
 }
 
-// Store billing key and subscription info
-function sanitizeForFirestore<T extends Record<string, any>>(obj: T): T {
-    if (!obj || typeof obj !== "object") return obj;
-    const out: any = Array.isArray(obj) ? [] : {};
-    for (const key of Object.keys(obj)) {
-        const val = (obj as any)[key];
-        if (val === undefined) continue;
-        if (val && typeof val === "object" && !Array.isArray(val)) {
-            out[key] = sanitizeForFirestore(val);
-        } else {
-            out[key] = val;
-        }
-    }
-    return out as T;
-}
-
-export async function saveSubscription(userId: string, data: SubscriptionData) {
+export async function saveSubscription(
+    userId: string,
+    data: SubscriptionData,
+    options?: { resetUsageAt?: string },
+) {
     try {
         const db = getDb();
         const userRef = doc(db, "users", userId);
@@ -57,12 +46,13 @@ export async function saveSubscription(userId: string, data: SubscriptionData) {
 
         await setDoc(
             userRef,
-            {
+            buildUserRootPatch({
+                existingUser: currentData,
                 subscription: sanitized,
-                plan: data.plan, // Store plan at root level for easy access
-                aiCallUsage: currentData.aiCallUsage ?? 0, // Preserve existing usage or initialize to 0
-                updatedAt: new Date().toISOString(),
-            },
+                plan: data.plan,
+                aiCallUsage: options?.resetUsageAt ? 0 : undefined,
+                usageResetAt: options?.resetUsageAt,
+            }),
             { merge: true },
         );
         return { success: true };
@@ -124,7 +114,16 @@ export async function getSubscription(userId: string) {
         const userDoc = await getDoc(userRef);
 
         if (userDoc.exists()) {
-            return userDoc.data().subscription as SubscriptionData;
+            const data = userDoc.data();
+            const rootSubscription = data.subscription as SubscriptionData | undefined;
+            if (rootSubscription) return rootSubscription;
+
+            const legacySubscriptionDoc = await getDoc(
+                doc(db, "users", userId, "subscription", "current"),
+            );
+            if (legacySubscriptionDoc.exists()) {
+                return legacySubscriptionDoc.data() as SubscriptionData;
+            }
         }
         return null;
     } catch (error) {

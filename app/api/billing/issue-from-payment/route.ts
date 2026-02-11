@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getFirestore, doc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 import { getFirebaseApp } from "../../../../firebaseConfig";
 import { getNextBillingDate } from "@/lib/subscription";
+import { buildUserRootPatch, inferPlanFromAmount } from "@/lib/userData";
 
 /**
  * 결제 완료 후 빌링키 발급
@@ -9,8 +10,14 @@ import { getNextBillingDate } from "@/lib/subscription";
  */
 export async function POST(request: NextRequest) {
     try {
-        const { paymentKey, customerKey, amount, orderName, billingCycle } =
-            await request.json();
+        const {
+            paymentKey,
+            customerKey,
+            userId: passedUserId,
+            amount,
+            orderName,
+            billingCycle,
+        } = await request.json();
 
         if (!paymentKey || !customerKey) {
             return NextResponse.json(
@@ -63,18 +70,18 @@ export async function POST(request: NextRequest) {
         }
 
         // Firestore 저장
-        const userId = customerKey.replace(/^(customer_|user_)/, "");
+        const userId =
+            passedUserId || extractUserIdFromCustomerKey(customerKey);
+        if (!userId) {
+            return NextResponse.json(
+                { success: false, error: "userId를 확인할 수 없습니다" },
+                { status: 400 },
+            );
+        }
 
         // Handle test billing cycle (100 won / 1 minute)
         const cycle = billingCycle || "monthly";
-        const plan =
-            cycle === "test"
-                ? "test"
-                : amount >= 49900
-                  ? "pro"
-                  : amount >= 19900
-                    ? "plus"
-                    : "free";
+        const plan = inferPlanFromAmount(Number(amount || 0), cycle);
 
         const subscriptionData = {
             billingKey,
@@ -82,6 +89,7 @@ export async function POST(request: NextRequest) {
             plan,
             status: "active",
             registeredAt: new Date().toISOString(),
+            lastPaymentDate: new Date().toISOString(),
             isRecurring: true,
             amount: amount || 0,
             orderName: orderName || "Nova AI 구독",
@@ -90,9 +98,21 @@ export async function POST(request: NextRequest) {
         };
 
         const db = getFirestore(getFirebaseApp());
+        const userRef = doc(db, "users", userId);
+        const existingUserDoc = await getDoc(userRef);
+        const existingUser = existingUserDoc.exists()
+            ? (existingUserDoc.data() as Record<string, unknown>)
+            : {};
+
         await setDoc(
-            doc(db, "users", userId, "subscription", "current"),
-            subscriptionData,
+            userRef,
+            buildUserRootPatch({
+                existingUser,
+                subscription: subscriptionData as unknown as Record<string, unknown>,
+                plan: subscriptionData.plan,
+                aiCallUsage: 0,
+                usageResetAt: subscriptionData.lastPaymentDate,
+            }),
             { merge: true },
         );
 
@@ -108,4 +128,16 @@ export async function POST(request: NextRequest) {
             { status: 500 },
         );
     }
+}
+
+function extractUserIdFromCustomerKey(customerKey?: string): string | null {
+    if (!customerKey) return null;
+    if (customerKey.startsWith("user_")) {
+        return customerKey.slice("user_".length) || null;
+    }
+    const customerMatch = customerKey.match(/^customer_(.+)_\d+$/);
+    if (customerMatch?.[1]) {
+        return customerMatch[1];
+    }
+    return null;
 }

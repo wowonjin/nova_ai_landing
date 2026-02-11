@@ -105,7 +105,7 @@ function PaymentFailContent() {
                     }}
                 >
                     <button
-                        onClick={() => router.push("/payment")}
+                        onClick={() => router.push("/")}
                         style={{
                             width: "100%",
                             padding: 16,

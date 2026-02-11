@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import admin from "firebase-admin";
+import { buildUserRootPatch, sanitizeForFirestore } from "@/lib/userData";
 
 // Initialize admin SDK once
 if (!admin.apps.length) {
@@ -73,17 +74,17 @@ export async function POST(request: NextRequest) {
         const planAmounts: Record<string, { monthly: number; yearly: number }> =
             {
                 free: { monthly: 0, yearly: 0 },
-                plus: { monthly: 19900, yearly: 159000 },
-                pro: { monthly: 49900, yearly: 399000 },
+                plus: { monthly: 29900, yearly: 159000 },
+                pro: { monthly: 99000, yearly: 399000 },
             };
         const newAmount =
             planAmounts[plan]?.[cycle as "monthly" | "yearly"] || 0;
 
         // Plan display names for orderName
         const planNames: Record<string, string> = {
-            free: "무료",
-            plus: "플러스",
-            pro: "프로",
+            free: "Free",
+            plus: "Plus",
+            pro: "Ultra",
         };
 
         // Only delete billing key when downgrading to FREE plan
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest) {
 
         // Update subscription - update amount, orderName, and billingCycle for plan changes
         // The scheduled billing will use the new amount automatically
-        const updatedSubscription = {
+        const updatedSubscription = sanitizeForFirestore({
             ...currentSubscription,
             plan: plan,
             amount: newAmount,
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
                 isRecurring: false,
                 nextBillingDate: null,
             }),
-        };
+        });
 
         // Remove undefined fields
         Object.keys(updatedSubscription).forEach(
@@ -152,11 +153,11 @@ export async function POST(request: NextRequest) {
         );
 
         await db.collection("users").doc(userId).set(
-            {
-                subscription: updatedSubscription,
-                plan: plan, // Also update root-level plan field
-                updatedAt: new Date().toISOString(),
-            },
+            buildUserRootPatch({
+                existingUser: (userDoc.data() || {}) as Record<string, unknown>,
+                subscription: updatedSubscription as Record<string, unknown>,
+                plan: plan as "free" | "plus" | "pro",
+            }),
             { merge: true },
         );
 

@@ -40,7 +40,9 @@ export async function POST(request: NextRequest) {
             nextBillingDate: getNextBillingDate(),
             status: "active",
             amount: amount || 0,
-        });
+        }, amount
+            ? { resetUsageAt: new Date().toISOString() }
+            : undefined);
 
         if (!result.success) {
             logPaymentError(

@@ -181,6 +181,22 @@ body {
     outline: none;
 }
 
+.password-toggle-btn {
+    border: none;
+    background: transparent;
+    color: #d1d5db;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 0.25rem;
+    flex-shrink: 0;
+}
+
+.password-toggle-btn:hover {
+    color: #ffffff;
+}
+
 .login-btn {
     height: 3rem;
     width: 100%;

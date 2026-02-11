@@ -2,19 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAuth, onAuthStateChanged, User } from "firebase/auth";
+import { getAuth, onAuthStateChanged, signOut, User } from "firebase/auth";
 import { getFirebaseAppOrNull } from "@/firebaseConfig";
-import {
-    ADMIN_EMAIL,
-    ADMIN_EMAILS,
-    ADMIN_PASSWORD,
-    ADMIN_SESSION_STORAGE_KEY,
-} from "@/lib/adminPortal";
+import { ADMIN_EMAILS, ADMIN_SESSION_STORAGE_KEY } from "@/lib/adminPortal";
 import "./admin.css";
 
 interface Stats {
     dailyVisitors: number;
     dailyDownloads: number;
+    todaySales: number;
     totalSignups: number;
     dailyRevenue: Array<{
         date: string;
@@ -46,6 +42,7 @@ interface UserData {
     email: string;
     displayName: string;
     createdAt: string;
+    cumulativeAmount: number;
     subscription: {
         plan: string;
         status: string;
@@ -215,49 +212,15 @@ export default function AdminPage() {
 
     useEffect(() => {
         let active = true;
+
         const token =
             typeof window !== "undefined"
                 ? sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY)
                 : null;
 
         const verifyPortalSession = async () => {
-            const tryAutoAdminLogin = async () => {
-                try {
-                    const loginResponse = await fetch("/api/admin/login", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            email: ADMIN_EMAIL,
-                            password: ADMIN_PASSWORD,
-                        }),
-                    });
-                    if (!loginResponse.ok) {
-                        if (active) setAdminSessionToken(null);
-                        return;
-                    }
-                    const loginData = await loginResponse.json();
-                    const nextToken = String(loginData?.token || "");
-                    if (!nextToken) {
-                        if (active) setAdminSessionToken(null);
-                        return;
-                    }
-                    if (active) {
-                        sessionStorage.setItem(
-                            ADMIN_SESSION_STORAGE_KEY,
-                            nextToken,
-                        );
-                        setAdminSessionToken(nextToken);
-                    }
-                } catch {
-                    if (active) setAdminSessionToken(null);
-                }
-            };
-
             if (!token) {
-                await tryAutoAdminLogin();
-                if (active) {
-                    setPortalAuthChecked(true);
-                }
+                if (active) setPortalAuthChecked(true);
                 return;
             }
             try {
@@ -269,16 +232,12 @@ export default function AdminPage() {
                     setAdminSessionToken(token);
                 } else {
                     sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
-                    await tryAutoAdminLogin();
-                }
-            } catch {
-                if (active) {
                     setAdminSessionToken(null);
                 }
+            } catch {
+                if (active) setAdminSessionToken(null);
             } finally {
-                if (active) {
-                    setPortalAuthChecked(true);
-                }
+                if (active) setPortalAuthChecked(true);
             }
         };
 
@@ -466,8 +425,50 @@ export default function AdminPage() {
         );
     }
 
+    const handleAdminLogout = async () => {
+        if (typeof window !== "undefined") {
+            sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+        }
+        setAdminSessionToken(null);
+
+        if (authUser) {
+            const firebaseApp = getFirebaseAppOrNull();
+            if (firebaseApp) {
+                try {
+                    await signOut(getAuth(firebaseApp));
+                } catch {
+                    // ignore sign out errors and continue redirect
+                }
+            }
+        }
+
+        router.push("/login");
+    };
+
     return (
         <div className="admin-container">
+            <header className="admin-header">
+                <div className="admin-header-text">
+                    <h1>관리자 페이지</h1>
+                    <p>사용자, 결제, 통계를 한 곳에서 관리합니다.</p>
+                </div>
+                <div className="admin-header-actions">
+                    <button
+                        type="button"
+                        className="admin-home-btn"
+                        onClick={() => router.push("/")}
+                    >
+                        홈으로 이동
+                    </button>
+                    <button
+                        type="button"
+                        className="admin-logout-btn"
+                        onClick={handleAdminLogout}
+                    >
+                        로그아웃
+                    </button>
+                </div>
+            </header>
             <nav className="admin-nav">
                 <button
                     className={`admin-nav-btn ${activeTab === "dashboard" ? "active" : ""}`}
@@ -530,10 +531,7 @@ export default function AdminPage() {
                                     <div className="admin-stat-card">
                                         <h3>오늘 총 매출</h3>
                                         <p className="admin-stat-value">
-                                            {(
-                                                stats.dailyRevenue[0]
-                                                    ?.totalSales || 0
-                                            ).toLocaleString()}
+                                            {stats.todaySales.toLocaleString()}
                                             원
                                         </p>
                                     </div>
@@ -722,12 +720,11 @@ export default function AdminPage() {
                                     <thead>
                                         <tr>
                                             <th>이메일</th>
-                                            <th>이름</th>
-                                            <th>플랜</th>
+                                            <th>현재 플랜</th>
                                             <th>상태</th>
                                             <th>오늘 사용량</th>
                                             <th>남은 사용량</th>
-                                            <th>금액</th>
+                                            <th>누적 금액</th>
                                             <th>다음 결제일</th>
                                             <th>실패 횟수</th>
                                             <th>작업</th>
@@ -737,9 +734,6 @@ export default function AdminPage() {
                                         {users.map((user) => (
                                             <tr key={user.uid}>
                                                 <td>{user.email}</td>
-                                                <td>
-                                                    {user.displayName || "-"}
-                                                </td>
                                                 <td>
                                                     <span
                                                         className={`admin-plan-badge ${user.subscription.plan}`}
@@ -765,7 +759,9 @@ export default function AdminPage() {
                                                     {user.usage?.remaining ?? 0}
                                                 </td>
                                                 <td>
-                                                    {user.subscription.amount?.toLocaleString()}
+                                                    {(
+                                                        user.cumulativeAmount || 0
+                                                    ).toLocaleString()}
                                                     원
                                                 </td>
                                                 <td>

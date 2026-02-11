@@ -22,6 +22,7 @@ import {
     setDoc,
     enableNetwork,
 } from "firebase/firestore";
+import { nowIsoString } from "@/lib/userData";
 
 import {
     signInWithEmailAndPassword,
@@ -111,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setLoading(false);
 
             // If this is not the initial auth check, and we just transitioned
-            // from unauthenticated -> authenticated, redirect to /profile.
+            // from unauthenticated -> authenticated, redirect to the main page.
             try {
                 if (!initialAuthCheckedRef.current) {
                     initialAuthCheckedRef.current = true;
@@ -122,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 window.location.pathname === "/login";
                             // Let the login page handle post-login redirects.
                             if (!isOnLoginPage) {
-                                window.location.href = "/profile";
+                                window.location.href = "/";
                             }
                         } catch (e) {
                             /* ignore navigation errors */
@@ -188,7 +189,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 email: emailFromAuth,
                                 plan: "free",
                                 aiCallUsage: 0,
-                                createdAt: Date.now(),
+                                createdAt: nowIsoString(),
+                                updatedAt: nowIsoString(),
                             },
                             { merge: true },
                         );
@@ -210,6 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     if (data?.aiCallUsage === undefined)
                         updates.aiCallUsage = 0;
                     if (Object.keys(updates).length > 0) {
+                        updates.updatedAt = nowIsoString();
                         await setDoc(docRef, updates, { merge: true });
                     }
 
@@ -316,7 +319,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             avatar: avatarFromAuth,
                             displayName: cred.user.displayName || null,
                             email: cred.user.email || null,
-                            createdAt: Date.now(),
+                            createdAt: nowIsoString(),
+                            updatedAt: nowIsoString(),
+                            plan: "free",
+                            aiCallUsage: 0,
                         },
                         { merge: true },
                     );
@@ -376,7 +382,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const docRef = doc(db, "users", cred.user.uid);
             await setDoc(
                 docRef,
-                { avatar: null, createdAt: Date.now() },
+                {
+                    avatar: null,
+                    displayName: displayName || cred.user.displayName || null,
+                    email: cred.user.email || null,
+                    createdAt: nowIsoString(),
+                    updatedAt: nowIsoString(),
+                    plan: "free",
+                    aiCallUsage: 0,
+                },
                 { merge: true },
             );
             setAvatar(null);
@@ -632,7 +646,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         avatar: cred.user.photoURL || null,
                         displayName: cred.user.displayName || null,
                         email: cred.user.email || null,
-                        createdAt: Date.now(),
+                        createdAt: nowIsoString(),
+                        updatedAt: nowIsoString(),
+                        plan: "free",
+                        aiCallUsage: 0,
                     },
                     { merge: true },
                 );
@@ -749,7 +766,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         avatar: profile?.profile_image || null,
                         displayName: profile?.name || profile?.nickname || null,
                         email: profile?.email || null,
-                        createdAt: Date.now(),
+                        createdAt: nowIsoString(),
+                        updatedAt: nowIsoString(),
+                        plan: "free",
+                        aiCallUsage: 0,
                     },
                     { merge: true },
                 );
@@ -841,7 +861,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         avatar: profile?.profile_image || null,
                         displayName: profile?.name || profile?.nickname || null,
                         email: profile?.email || null,
-                        createdAt: Date.now(),
+                        createdAt: nowIsoString(),
+                        updatedAt: nowIsoString(),
+                        plan: "free",
+                        aiCallUsage: 0,
                     },
                     { merge: true },
                 );
@@ -917,7 +940,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         avatar,
                         displayName: cred.user.displayName || null,
                         email: cred.user.email || null,
-                        createdAt: Date.now(),
+                        createdAt: nowIsoString(),
+                        updatedAt: nowIsoString(),
+                        plan: "free",
+                        aiCallUsage: 0,
                     },
                     { merge: true },
                 );
@@ -925,7 +951,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
                 // ensure avatar present
                 if (!snap.data()?.avatar && avatar) {
-                    await setDoc(docRef, { avatar }, { merge: true });
+                    await setDoc(
+                        docRef,
+                        { avatar, updatedAt: nowIsoString() },
+                        { merge: true },
+                    );
                     setAvatar(avatar);
                 } else {
                     setAvatar((snap.data() as any).avatar ?? avatar);
@@ -1087,7 +1117,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             avatar: kakaoAvatar,
                             displayName: kakaoDisplayName,
                             email: kakaoEmail,
-                            createdAt: Date.now(),
+                            createdAt: nowIsoString(),
+                            updatedAt: nowIsoString(),
+                            plan: "free",
+                            aiCallUsage: 0,
                         },
                         { merge: true },
                     );
@@ -1097,7 +1130,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     if (!snap.exists()) {
                         await setDoc(
                             docRef,
-                            { avatar: null, createdAt: Date.now() },
+                            {
+                                avatar: null,
+                                createdAt: nowIsoString(),
+                                updatedAt: nowIsoString(),
+                                plan: "free",
+                                aiCallUsage: 0,
+                            },
                             { merge: true },
                         );
                         setAvatar(null);
@@ -1266,7 +1305,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             try {
                 await withTimeout(
-                    setDoc(docRef, { avatar: dataUrl }, { merge: true }),
+                    setDoc(
+                        docRef,
+                        { avatar: dataUrl, updatedAt: nowIsoString() },
+                        { merge: true },
+                    ),
                     15000,
                 );
                 const took = Date.now() - start;
@@ -1295,7 +1338,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 await enableNetwork(db);
                 const docRef = doc(db, "users", uid);
                 await withTimeout(
-                    setDoc(docRef, { avatar: dataUrl }, { merge: true }),
+                    setDoc(
+                        docRef,
+                        { avatar: dataUrl, updatedAt: nowIsoString() },
+                        { merge: true },
+                    ),
                     15000,
                 );
                 // retry succeeded
@@ -1370,7 +1417,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 await withTimeout(
                     setDoc(
                         docRef,
-                        { subscription: sanitized },
+                        {
+                            subscription: sanitized,
+                            plan:
+                                (sanitized.plan as
+                                    | "free"
+                                    | "plus"
+                                    | "pro"
+                                    | "test"
+                                    | undefined) || "free",
+                            updatedAt: nowIsoString(),
+                        },
                         { merge: true },
                     ),
                     15000,
@@ -1395,7 +1452,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 await withTimeout(
                     setDoc(
                         docRef,
-                        { subscription: sanitized },
+                        {
+                            subscription: sanitized,
+                            plan:
+                                (sanitized.plan as
+                                    | "free"
+                                    | "plus"
+                                    | "pro"
+                                    | "test"
+                                    | undefined) || "free",
+                            updatedAt: nowIsoString(),
+                        },
                         { merge: true },
                     ),
                     15000,

@@ -10,9 +10,9 @@ import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { getFirebaseAppOrNull } from "../../firebaseConfig";
 import {
     ADMIN_EMAIL,
-    ADMIN_PASSWORD,
     ADMIN_SESSION_STORAGE_KEY,
 } from "@/lib/adminPortal";
+import { normalizePlanLike } from "@/lib/userData";
 import "./login.css";
 import "../style.css";
 import "../mobile.css";
@@ -33,8 +33,6 @@ function LoginContent() {
         loginWithEmail,
         signupWithEmail,
         loginWithGoogle,
-        loginWithNaver,
-        loginWithKakao,
         requestPasswordReset,
         isAuthenticated,
         loading,
@@ -50,9 +48,11 @@ function LoginContent() {
     const [submitting, setSubmitting] = useState(false);
     const [info, setInfo] = useState<string | null>(null);
     const [signupMode, setSignupMode] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    // Helper function to fetch user tier from Firestore
-    const getUserTier = async (uid: string): Promise<string> => {
+    // Helper function to fetch canonical user plan from Firestore
+    const getUserPlan = async (uid: string): Promise<string> => {
         try {
             const firebaseApp = getFirebaseAppOrNull();
             if (!firebaseApp) return "free";
@@ -61,10 +61,13 @@ function LoginContent() {
             const snap = await getDoc(docRef);
             if (snap.exists()) {
                 const data = snap.data();
-                return data?.tier || data?.plan || "free";
+                return normalizePlanLike(
+                    data?.plan || data?.tier || data?.subscription?.plan,
+                    "free",
+                );
             }
         } catch (err) {
-            console.error("Failed to fetch user tier:", err);
+            console.error("Failed to fetch user plan:", err);
         }
         return "free";
     };
@@ -83,20 +86,24 @@ function LoginContent() {
             orderName &&
             !Number.isNaN(Number(amount))
         ) {
-            const homeParams = new URLSearchParams({
+            const paymentParams = new URLSearchParams({
                 openPayment: "true",
                 amount,
                 orderName,
             });
-            window.location.href = `/?${homeParams.toString()}`;
+            const billingCycle = searchParams?.get("billingCycle");
+            if (billingCycle) {
+                paymentParams.set("billingCycle", billingCycle);
+            }
+            window.location.href = `/?${paymentParams.toString()}`;
             return;
         }
 
         if (sessionId) {
             // Server-side OAuth flow for Python app
             try {
-                // Fetch user tier from Firestore
-                const tier = await getUserTier(user.uid);
+                // Fetch user plan from Firestore and expose it in both plan/tier keys
+                const plan = await getUserPlan(user.uid);
 
                 // Redirect to /auth-callback with user info and session ID
                 // The auth-callback page will store info server-side
@@ -105,7 +112,8 @@ function LoginContent() {
                     name: user.displayName || user.email?.split("@")[0] || "",
                     email: user.email || "",
                     photo_url: user.photoURL || "",
-                    tier: tier,
+                    tier: plan,
+                    plan,
                     session: sessionId,
                 });
 
@@ -123,8 +131,8 @@ function LoginContent() {
                 // Validate that redirect_uri is a valid URL
                 const url = new URL(redirectUri);
 
-                // Fetch user tier from Firestore
-                const tier = await getUserTier(user.uid);
+                // Fetch user plan from Firestore and expose it in both plan/tier keys
+                const plan = await getUserPlan(user.uid);
 
                 // Redirect to /auth-callback with user info and redirect_uri
                 // The auth-callback page will then redirect to the external redirect_uri
@@ -133,7 +141,8 @@ function LoginContent() {
                     name: user.displayName || user.email?.split("@")[0] || "",
                     email: user.email || "",
                     photo_url: user.photoURL || "",
-                    tier: tier,
+                    tier: plan,
+                    plan,
                     redirect_uri: redirectUri,
                 });
 
@@ -147,7 +156,7 @@ function LoginContent() {
         }
 
         // Default redirect if no redirect_uri or if redirect failed
-        window.location.href = "/profile";
+        window.location.href = "/";
     };
 
     useEffect(() => {
@@ -167,7 +176,7 @@ function LoginContent() {
                     return;
                 }
             }
-            window.location.href = "/profile";
+            window.location.href = "/";
         }
     }, [isAuthenticated, loading, searchParams]);
 
@@ -194,10 +203,7 @@ function LoginContent() {
                 await handlePostLoginRedirect(user);
             } else {
                 const normalizedEmail = form.email.trim().toLowerCase();
-                if (
-                    normalizedEmail === ADMIN_EMAIL &&
-                    form.password === ADMIN_PASSWORD
-                ) {
+                if (normalizedEmail === ADMIN_EMAIL) {
                     const response = await fetch("/api/admin/login", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -207,7 +213,9 @@ function LoginContent() {
                         }),
                     });
                     if (!response.ok) {
-                        throw new Error("관리자 로그인에 실패했습니다.");
+                        setError("관리자 비밀번호를 확인해주세요.");
+                        setSubmitting(false);
+                        return;
                     }
                     const data = await response.json();
                     if (typeof window !== "undefined") {
@@ -435,65 +443,6 @@ function LoginContent() {
                             <span>Google로 계속하기</span>
                         </button>
 
-                        <button
-                            type="button"
-                            className="social-btn naver-btn"
-                            onClick={async () => {
-                                setError(null);
-                                setInfo(null);
-                                setSubmitting(true);
-                                try {
-                                    const user = await loginWithNaver();
-                                    await handlePostLoginRedirect(user);
-                                } catch (err: any) {
-                                    console.error("Naver login failed", err);
-                                    setError(
-                                        err?.message ||
-                                            "Naver 로그인에 실패했습니다."
-                                    );
-                                } finally {
-                                    setSubmitting(false);
-                                }
-                            }}
-                            disabled={submitting}
-                        >
-                            <img
-                                src="/naver-logo.png"
-                                alt="Naver"
-                                className="social-icon"
-                            />
-                            <span>네이버로 계속하기</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            className="social-btn kakao-btn"
-                            onClick={async () => {
-                                setError(null);
-                                setInfo(null);
-                                setSubmitting(true);
-                                try {
-                                    const user = await loginWithKakao();
-                                    await handlePostLoginRedirect(user);
-                                } catch (err: any) {
-                                    console.error("Kakao login failed", err);
-                                    setError(
-                                        err?.message ||
-                                            "Kakao 로그인에 실패했습니다."
-                                    );
-                                } finally {
-                                    setSubmitting(false);
-                                }
-                            }}
-                            disabled={submitting}
-                        >
-                            <img
-                                src="/kakao-logo.png"
-                                alt="Kakao"
-                                className="social-icon"
-                            />
-                            <span>카카오로 계속하기</span>
-                        </button>
                     </div>
 
                     {/* 구분선 */}
@@ -556,12 +505,26 @@ function LoginContent() {
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                                 </svg>
                                 <input
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     placeholder="6자 이상 입력"
                                     value={form.password}
                                     onChange={handleChange("password")}
                                     required
                                 />
+                                <button
+                                    type="button"
+                                    className="password-toggle-btn"
+                                    onClick={() =>
+                                        setShowPassword((prev) => !prev)
+                                    }
+                                    aria-label={
+                                        showPassword
+                                            ? "비밀번호 숨기기"
+                                            : "비밀번호 보기"
+                                    }
+                                >
+                                    {showPassword ? "숨기기" : "보기"}
+                                </button>
                             </div>
                         </label>
 
@@ -599,7 +562,11 @@ function LoginContent() {
                                         <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                                     </svg>
                                     <input
-                                        type="password"
+                                        type={
+                                            showConfirmPassword
+                                                ? "text"
+                                                : "password"
+                                        }
                                         placeholder="비밀번호를 다시 입력해주세요"
                                         value={form.confirmPassword}
                                         onChange={handleChange(
@@ -607,6 +574,22 @@ function LoginContent() {
                                         )}
                                         required
                                     />
+                                    <button
+                                        type="button"
+                                        className="password-toggle-btn"
+                                        onClick={() =>
+                                            setShowConfirmPassword(
+                                                (prev) => !prev,
+                                            )
+                                        }
+                                        aria-label={
+                                            showConfirmPassword
+                                                ? "비밀번호 확인 숨기기"
+                                                : "비밀번호 확인 보기"
+                                        }
+                                    >
+                                        {showConfirmPassword ? "숨기기" : "보기"}
+                                    </button>
                                 </div>
                             </label>
                         )}

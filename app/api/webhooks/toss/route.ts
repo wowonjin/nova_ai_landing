@@ -157,6 +157,8 @@ async function handlePaymentDone(userId: string, data: any) {
                 "subscription.lastPaymentDate": new Date().toISOString(),
                 "subscription.lastOrderId": orderId,
                 "subscription.failureCount": 0,
+                aiCallUsage: 0,
+                usageResetAt: approvedAt || new Date().toISOString(),
             });
         }
 
@@ -278,11 +280,13 @@ async function updateWebhookLog(paymentKey: string, processed: boolean) {
 function extractUserId(customerKey: string | undefined): string | null {
     if (!customerKey) return null;
 
+    if (customerKey.startsWith("user_")) {
+        return customerKey.slice("user_".length) || null;
+    }
+
     if (customerKey.startsWith("customer_")) {
-        const parts = customerKey.split("_");
-        if (parts.length >= 2) {
-            return parts[1];
-        }
+        const customerMatch = customerKey.match(/^customer_(.+)_\d+$/);
+        if (customerMatch?.[1]) return customerMatch[1];
     }
 
     if (customerKey.length >= 20 && !customerKey.includes("@")) {

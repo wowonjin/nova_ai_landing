@@ -160,6 +160,8 @@ function PaymentSuccessContent() {
                 const orderName = searchParams.get("orderName") || "";
                 const billingCycle =
                     searchParams.get("billingCycle") || "monthly";
+                const urlUserId = searchParams.get("uid");
+                const resolvedUserId = urlUserId || user?.uid || null;
 
                 // 구독 결제 - 결제위젯으로 진행한 경우 (paymentKey 존재)
                 if (isRecurring && paymentKey && !authKey) {
@@ -167,8 +169,8 @@ function PaymentSuccessContent() {
                     const urlCustomerKey = searchParams.get("customerKey");
                     const finalCustomerKey =
                         urlCustomerKey ||
-                        (user
-                            ? `user_${user.uid
+                        (resolvedUserId
+                            ? `user_${resolvedUserId
                                   .replace(/[^a-zA-Z0-9\-_=.@]/g, "")
                                   .substring(0, 40)}`
                             : null);
@@ -186,6 +188,7 @@ function PaymentSuccessContent() {
                             paymentKey,
                             orderId,
                             amount: Number(amount),
+                            userId: resolvedUserId,
                         }),
                     });
 
@@ -222,6 +225,7 @@ function PaymentSuccessContent() {
                             body: JSON.stringify({
                                 paymentKey,
                                 customerKey: finalCustomerKey,
+                                userId: resolvedUserId,
                                 amount: Number(amount),
                                 orderName,
                                 billingCycle,
@@ -260,7 +264,7 @@ function PaymentSuccessContent() {
                         body: JSON.stringify({
                             authKey,
                             customerKey,
-                            userId: user?.uid, // Pass actual Firebase userId
+                            userId: resolvedUserId,
                             amount: Number(amount),
                             orderName,
                             billingCycle,
@@ -308,6 +312,7 @@ function PaymentSuccessContent() {
                         paymentKey,
                         orderId,
                         amount: Number(amount),
+                        userId: resolvedUserId,
                     }),
                 });
 
@@ -330,21 +335,23 @@ function PaymentSuccessContent() {
                             toss?.totalAmount ?? toss?.amount ?? 0,
                         );
                         const plan =
-                            total >= 19900
+                            total >= 99000
                                 ? "pro"
-                                : total >= 9900
+                                : total >= 100
                                   ? "plus"
                                   : null;
                         const customerKey = toss?.customerKey || null;
 
-                        let targetUserId = user?.uid;
+                        let targetUserId = resolvedUserId;
                         if (
                             !targetUserId &&
                             customerKey &&
                             typeof customerKey === "string"
                         ) {
-                            const parts = customerKey.split("_");
-                            if (parts.length > 1) targetUserId = parts[1];
+                            targetUserId = customerKey.replace(
+                                /^(customer_|user_)/,
+                                "",
+                            );
                         }
 
                         if (user && updateSubscription && plan) {
@@ -445,7 +452,7 @@ function PaymentSuccessContent() {
 
     if (loading) return <Loading />;
     if (error)
-        return <Fail error={error} onRetry={() => router.push("/payment")} />;
+        return <Fail error={error} onRetry={() => router.push("/")} />;
 
     return (
         <Success

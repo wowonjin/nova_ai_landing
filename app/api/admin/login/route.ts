@@ -2,15 +2,21 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSessionToken } from "@/lib/adminAuth";
-import { ADMIN_EMAIL, ADMIN_PASSWORD } from "@/lib/adminPortal";
+import {
+    ADMIN_EMAIL,
+    ADMIN_PASSWORD_ALIASES,
+} from "@/lib/adminPortal";
 
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json().catch(() => null);
         const email = String(body?.email ?? "").trim().toLowerCase();
-        const password = String(body?.password ?? "");
+        const password = String(body?.password ?? "").trim();
 
-        if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+        if (
+            email !== ADMIN_EMAIL ||
+            !ADMIN_PASSWORD_ALIASES.includes(password)
+        ) {
             return NextResponse.json(
                 { error: "Invalid admin credentials" },
                 { status: 401 },

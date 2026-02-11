@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildUserRootPatch, inferPlanFromAmount } from "@/lib/userData";
 
 /**
  * 결제 성공 후 빌링키 자동 발급
@@ -8,8 +9,14 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function POST(request: NextRequest) {
     try {
-        const { paymentKey, customerKey, amount, orderName, billingCycle } =
-            await request.json();
+        const {
+            paymentKey,
+            customerKey,
+            userId: passedUserId,
+            amount,
+            orderName,
+            billingCycle,
+        } = await request.json();
 
         if (!paymentKey || !customerKey) {
             return NextResponse.json(
@@ -56,20 +63,22 @@ export async function POST(request: NextRequest) {
         const { billingKey } = result;
 
         // Firestore 저장 로직은 /api/billing/issue에서 재사용
-        const userId = customerKey.replace(/^(customer_|user_)/, "");
+        const userId =
+            passedUserId || extractUserIdFromCustomerKey(customerKey);
+        if (!userId) {
+            return NextResponse.json(
+                { success: false, error: "userId를 확인할 수 없습니다" },
+                { status: 400 },
+            );
+        }
 
         const subscriptionData = {
             billingKey,
             customerKey,
-            plan: amount
-                ? amount >= 49900
-                    ? "pro"
-                    : amount >= 19900
-                      ? "plus"
-                      : "free"
-                : "free",
+            plan: inferPlanFromAmount(Number(amount || 0), billingCycle),
             status: "active",
             registeredAt: new Date().toISOString(),
+            lastPaymentDate: new Date().toISOString(),
             isRecurring: true,
             amount: amount || 0,
             orderName: orderName || "Nova AI 구독",
@@ -80,14 +89,26 @@ export async function POST(request: NextRequest) {
         };
 
         // Firestore 저장
-        const { getFirestore, doc, setDoc } =
+        const { getFirestore, doc, setDoc, getDoc } =
             await import("firebase/firestore");
         const { getFirebaseApp } = await import("../../../../firebaseConfig");
         const db = getFirestore(getFirebaseApp());
 
+        const userRef = doc(db, "users", userId);
+        const existingUserDoc = await getDoc(userRef);
+        const existingUser = existingUserDoc.exists()
+            ? (existingUserDoc.data() as Record<string, unknown>)
+            : {};
+
         await setDoc(
-            doc(db, "users", userId, "subscription", "current"),
-            subscriptionData,
+            userRef,
+            buildUserRootPatch({
+                existingUser,
+                subscription: subscriptionData as unknown as Record<string, unknown>,
+                plan: subscriptionData.plan,
+                aiCallUsage: 0,
+                usageResetAt: subscriptionData.lastPaymentDate,
+            }),
             { merge: true },
         );
 
@@ -103,4 +124,16 @@ export async function POST(request: NextRequest) {
             { status: 500 },
         );
     }
+}
+
+function extractUserIdFromCustomerKey(customerKey?: string): string | null {
+    if (!customerKey) return null;
+    if (customerKey.startsWith("user_")) {
+        return customerKey.slice("user_".length) || null;
+    }
+    const customerMatch = customerKey.match(/^customer_(.+)_\d+$/);
+    if (customerMatch?.[1]) {
+        return customerMatch[1];
+    }
+    return null;
 }

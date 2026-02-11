@@ -65,6 +65,11 @@
     margin-right: auto;
 }
 
+.download-platforms.single-platform {
+    grid-template-columns: minmax(280px, 420px);
+    justify-content: center;
+}
+
 .download-card {
     display: flex;
     flex-direction: column;

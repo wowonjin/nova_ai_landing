@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { buildUserRootPatch } from "@/lib/userData";
 
 interface ExchangeRequest {
     code?: string;
@@ -109,16 +110,22 @@ export async function POST(req: Request) {
             try {
                 const db = admin.firestore();
                 const docRef = db.collection("users").doc(uid);
+                const existingUser = await docRef.get();
                 await docRef.set(
-                    {
-                        avatar: profile?.response?.profile_image || null,
-                        displayName:
-                            profile?.response?.name ||
-                            profile?.response?.nickname ||
-                            null,
-                        email: profile?.response?.email || null,
-                        createdAt: Date.now(),
-                    },
+                    buildUserRootPatch({
+                        existingUser: existingUser.exists
+                            ? (existingUser.data() as Record<string, unknown>)
+                            : undefined,
+                        profile: {
+                            avatar: profile?.response?.profile_image || null,
+                            displayName:
+                                profile?.response?.name ||
+                                profile?.response?.nickname ||
+                                null,
+                            email: profile?.response?.email || null,
+                        },
+                        plan: "free",
+                    }),
                     { merge: true },
                 );
             } catch (err: any) {

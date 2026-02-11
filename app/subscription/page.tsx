@@ -84,13 +84,13 @@ export default function SubscriptionDashboard() {
         try {
             // 프로필 페이지의 구독 로직을 재사용 (단건 결제)
             const planPrices = {
-                plus: { monthly: 19900, yearly: 159000 },
-                pro: { monthly: 49900, yearly: 399000 },
+                plus: { monthly: 29900, yearly: 159000 },
+                pro: { monthly: 99000, yearly: 399000 },
             };
 
             const amount = planPrices[plan][cycle];
             const orderName = `Nova AI ${
-                plan === "plus" ? "플러스" : "프로"
+                plan === "plus" ? "Plus" : "Ultra"
             } 요금제`;
 
             // 단건 결제로 이동
@@ -311,8 +311,8 @@ export default function SubscriptionDashboard() {
                         <h2 style={styles.sectionTitle}>🚀 구독 시작</h2>
                         <div style={styles.planGrid}>
                             <div style={styles.planCard}>
-                                <h3 style={styles.planTitle}>플러스 플랜</h3>
-                                <p style={styles.planPrice}>월 9,900원</p>
+                                <h3 style={styles.planTitle}>Plus 요금제</h3>
+                                <p style={styles.planPrice}>월 29,900원</p>
                                 <button
                                     style={styles.button}
                                     onClick={() =>
@@ -350,8 +350,8 @@ export default function SubscriptionDashboard() {
                             </div>
 
                             <div style={styles.planCard}>
-                                <h3 style={styles.planTitle}>프로 플랜</h3>
-                                <p style={styles.planPrice}>월 29,900원</p>
+                                <h3 style={styles.planTitle}>Ultra 요금제</h3>
+                                <p style={styles.planPrice}>월 99,000원</p>
                                 <button
                                     style={styles.button}
                                     onClick={() =>

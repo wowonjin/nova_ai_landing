@@ -31,10 +31,6 @@ export default function DownloadContent() {
         { img: "/setup15.png", step: 5 },
     ];
 
-    // GitHub Releases - Update version tag (v1.0.0) when releasing new versions
-    const GITHUB_RELEASE_BASE =
-        "https://github.com/MisterKinn/formulite-landing/releases/download/v1.0.0";
-
     const platforms = [
         {
             name: "Windows",
@@ -42,13 +38,6 @@ export default function DownloadContent() {
             link: "https://storage.googleapis.com/physics2/NovaAI_Setup_1.0.0.exe",
             desc: "Windows 10 이상",
             size: "104 MB",
-        },
-        {
-            name: "Mac",
-            img: "/apple.png",
-            link: `${GITHUB_RELEASE_BASE}/nova-ai-setup-mac.dmg`,
-            desc: "macOS 11 이상",
-            size: "253 MB",
         },
     ];
 
@@ -178,7 +167,12 @@ export default function DownloadContent() {
                 </section>
 
                 {/* Platform Cards */}
-                <section className="download-platforms" data-aos="fade-in">
+                <section
+                    className={`download-platforms ${
+                        platforms.length === 1 ? "single-platform" : ""
+                    }`}
+                    data-aos="fade-in"
+                >
                     {platforms.map((p) => (
                         <div
                             key={p.name}
@@ -322,7 +316,7 @@ export default function DownloadContent() {
                                 운영체제
                             </span>
                             <span className="download-requirement-value">
-                                Windows 10+, macOS 11+
+                                Windows 10+
                             </span>
                         </div>
                         <div className="download-requirement-item">

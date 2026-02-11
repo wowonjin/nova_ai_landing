@@ -85,3 +85,23 @@ Security notes:
 -   The server validates `state` stored in cookies to mitigate CSRF.
 
 If you'd like, I can add logging, tests, or a server-side user provisioning step (e.g., store the provider profile in Firestore).
+
+---
+
+## Firestore Users Backfill
+
+To normalize existing `users/{uid}` documents to the unified schema (profile + subscription + usage), run:
+
+```bash
+# Preview only
+node scripts/backfill_users_firestore.js --dry-run
+
+# Apply changes
+node scripts/backfill_users_firestore.js --apply
+```
+
+Notes:
+
+- Requires Firebase Admin credentials (`FIREBASE_ADMIN_CREDENTIALS`, `FIREBASE_ADMIN_CREDENTIALS_B64`, or ADC).
+- The script merges legacy `users/{uid}/subscription/current` into `users/{uid}.subscription` when needed.
+- Dry-run prints changed counts and sample users without writing.

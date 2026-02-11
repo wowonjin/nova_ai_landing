@@ -7,12 +7,54 @@ import { getFirebaseAppOrNull } from "../firebaseConfig";
 export function Navbar() {
     const { isAuthenticated, avatar, logout, user } = useAuth();
     const [displayName, setDisplayName] = useState<string | null>(null);
-    const [userPlan, setUserPlan] = useState<string>("free");
+    const [userPlan, setUserPlan] = useState<string | null>(null);
+    const [planResolved, setPlanResolved] = useState(false);
     const [aiUsage, setAiUsage] = useState<{
         currentUsage: number;
         limit: number;
         remaining: number;
     } | null>(null);
+
+    const normalizePlan = (value?: unknown): "free" | "plus" | "pro" | "test" => {
+        if (typeof value !== "string") return "free";
+        const normalized = value.trim().toLowerCase();
+        if (normalized === "pro" || normalized === "ultra") return "pro";
+        if (normalized === "plus" || normalized === "test") return normalized;
+        return "free";
+    };
+
+    const inferPlanFromOrderName = (value?: unknown): "free" | "plus" | "pro" => {
+        if (typeof value !== "string") return "free";
+        const normalized = value.toLowerCase();
+        if (normalized.includes("ultra") || normalized.includes("pro")) return "pro";
+        if (normalized.includes("plus")) return "plus";
+        return "free";
+    };
+
+    const getPlanRank = (plan: "free" | "plus" | "pro" | "test") => {
+        if (plan === "pro") return 2;
+        if (plan === "plus" || plan === "test") return 1;
+        return 0;
+    };
+
+    const resolvePlanFromUserData = (data: any): "free" | "plus" | "pro" | "test" => {
+        const direct = normalizePlan(
+            data?.subscription?.plan ?? data?.plan ?? data?.tier,
+        );
+        if (direct !== "free") return direct;
+
+        const fallbackByAmount =
+            typeof data?.subscription?.amount === "number"
+                ? data.subscription.amount >= 99000
+                    ? "pro"
+                    : data.subscription.amount >= 100
+                      ? "plus"
+                      : "free"
+                : "free";
+        if (fallbackByAmount !== "free") return fallbackByAmount;
+
+        return inferPlanFromOrderName(data?.subscription?.orderName);
+    };
 
     useEffect(() => {
         let mounted = true;
@@ -20,11 +62,13 @@ export function Navbar() {
             if (!user) {
                 if (mounted) {
                     setDisplayName(null);
-                    setUserPlan("free");
+                    setUserPlan(null);
                     setAiUsage(null);
+                    setPlanResolved(false);
                 }
                 return;
             }
+            if (mounted) setPlanResolved(false);
             if (user.displayName) {
                 if (mounted) setDisplayName(user.displayName);
             }
@@ -37,9 +81,8 @@ export function Navbar() {
                 if (mounted && snap.exists()) {
                     const data = snap.data() as any;
                     setDisplayName(data?.displayName ?? null);
-                    const plan =
-                        data?.subscription?.plan || data?.plan || "free";
-                    setUserPlan(plan);
+                    setUserPlan(resolvePlanFromUserData(data));
+                    setPlanResolved(true);
                 }
             } catch (err) {
                 // non-fatal
@@ -48,7 +91,8 @@ export function Navbar() {
             // Fetch AI usage data
             try {
                 const res = await fetch(
-                    `/api/ai/check-limit?userId=${user.uid}`,
+                    `/api/ai/check-limit?userId=${user.uid}&t=${Date.now()}`,
+                    { cache: "no-store" },
                 );
                 if (res.ok) {
                     const data = await res.json();
@@ -58,10 +102,54 @@ export function Navbar() {
                             limit: data.limit,
                             remaining: data.remaining,
                         });
+                        const apiPlan = normalizePlan(data.plan);
+                        setUserPlan((prev) => {
+                            const prevPlan = normalizePlan(prev);
+                            return getPlanRank(apiPlan) > getPlanRank(prevPlan)
+                                ? apiPlan
+                                : prevPlan;
+                        });
+                        setPlanResolved(true);
                     }
                 }
             } catch (err) {
                 // non-fatal
+            }
+
+            // Final fallback: infer from recent payment history when plan is still free
+            try {
+                const paymentsRes = await fetch(
+                    `/api/payments/history?userId=${user.uid}`,
+                );
+                if (paymentsRes.ok && mounted) {
+                    const payload = await paymentsRes.json();
+                    const payments = Array.isArray(payload?.payments)
+                        ? payload.payments
+                        : [];
+                    const latestPaid = payments.find((payment: any) => {
+                        const status = String(payment?.status || "").toUpperCase();
+                        return status === "DONE";
+                    });
+                    const inferredByHistory = normalizePlan(
+                        inferPlanFromOrderName(latestPaid?.orderName),
+                    );
+                    if (getPlanRank(inferredByHistory) > getPlanRank("free")) {
+                        setUserPlan((prev) => {
+                            const prevPlan = normalizePlan(prev);
+                            return getPlanRank(inferredByHistory) >
+                                getPlanRank(prevPlan)
+                                ? inferredByHistory
+                                : prevPlan;
+                        });
+                    }
+                    setPlanResolved(true);
+                }
+            } catch (err) {
+                // non-fatal
+            }
+            if (mounted) {
+                setPlanResolved(true);
+                setUserPlan((prev) => prev ?? "free");
             }
         }
         loadUserData();
@@ -69,17 +157,57 @@ export function Navbar() {
             mounted = false;
         };
     }, [user]);
+
+    useEffect(() => {
+        let mounted = true;
+        async function refreshUsage() {
+            if (!user) return;
+            try {
+                const res = await fetch(
+                    `/api/ai/check-limit?userId=${user.uid}&t=${Date.now()}`,
+                    { cache: "no-store" },
+                );
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!mounted) return;
+                setAiUsage({
+                    currentUsage: data.currentUsage,
+                    limit: data.limit,
+                    remaining: data.remaining,
+                });
+                const apiPlan = normalizePlan(data.plan);
+                setUserPlan((prev) => {
+                    const prevPlan = normalizePlan(prev);
+                    return getPlanRank(apiPlan) > getPlanRank(prevPlan)
+                        ? apiPlan
+                        : prevPlan;
+                });
+                setPlanResolved(true);
+            } catch (err) {
+                // non-fatal
+            }
+        }
+
+        refreshUsage();
+        const timer = window.setInterval(refreshUsage, 15000);
+        return () => {
+            mounted = false;
+            window.clearInterval(timer);
+        };
+    }, [user]);
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
     // Get plan display name
-    const getPlanDisplayName = (plan: string): string => {
+    const getPlanDisplayName = (plan: string | null): string => {
+        if (!plan || !planResolved) return "요금제 확인 중";
         const planNames: Record<string, string> = {
-            pro: "프로 플랜",
-            plus: "플러스 플랜",
-            free: "무료 플랜",
+            pro: "Ultra 요금제",
+            plus: "Plus 요금제",
+            test: "Plus 요금제",
+            free: "Free",
         };
-        return planNames[plan] || "무료 플랜";
+        return planNames[plan] || "Free";
     };
 
     // Close menu on outside click
@@ -100,37 +228,16 @@ export function Navbar() {
     return (
         <nav className="navbar animate-fade-in">
             <div className="navbar-inner">
-                <a href="/" title="유노바" className="nav-brand no-hover">
-                    <div className="brand-mark no-hover">
-                        <img
-                            src="../nova-logo.png"
-                            alt="노바AI 로고"
-                            className="brand-mark-img"
-                        />
-                    </div>
+                <a href="/" title="NOVA AI" className="nav-brand no-hover">
+                    <span className="brand-text">NOVA AI</span>
                 </a>
 
                 <div className="nav-items">
-                    <a href="/#home" className="nav-link">
-                        메인
-                    </a>
                     <a href="/#exam-typing" className="nav-link">
                         시험지 타이핑
                     </a>
-                    <a href="/#gemini-ai" className="nav-link">
-                        이미지 추론
-                    </a>
-                    <a href="/#testimonials" className="nav-link">
-                        후기
-                    </a>
-                    <a href="/#cost-comparison" className="nav-link">
-                        비용 비교
-                    </a>
                     <a href="/#pricing" className="nav-link">
                         요금제
-                    </a>
-                    <a href="/#faq" className="nav-link">
-                        FAQ
                     </a>
                     <a href="/download" className="nav-download-gradient">
                         지금 다운로드
@@ -228,7 +335,9 @@ export function Navbar() {
                                             </div>
                                         </div>
                                     )}
-                                    <div className="nav-profile-dropdown-divider"></div>
+                                    {aiUsage && (
+                                        <div className="nav-profile-dropdown-divider"></div>
+                                    )}
                                     <a
                                         href="/profile"
                                         className="nav-profile-dropdown-item"
@@ -290,7 +399,7 @@ export function Navbar() {
                                         onClick={() => {
                                             sessionStorage.setItem(
                                                 "profileTab",
-                                                "account",
+                                                "payment",
                                             );
                                         }}
                                     >
@@ -304,10 +413,9 @@ export function Navbar() {
                                             strokeLinecap="round"
                                             strokeLinejoin="round"
                                         >
-                                            <circle cx="12" cy="12" r="3" />
-                                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                                         </svg>
-                                        <span>계정 설정</span>
+                                        <span>결제내역</span>
                                     </a>
                                     <div className="nav-profile-dropdown-divider"></div>
                                     <button

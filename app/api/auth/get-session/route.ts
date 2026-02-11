@@ -67,7 +67,8 @@ export async function GET(request: NextRequest) {
                 email: sessionData.email,
                 name: sessionData.name,
                 photoUrl: sessionData.photoUrl,
-                tier: sessionData.tier,
+                tier: sessionData.tier || sessionData.plan || "free",
+                plan: sessionData.plan || sessionData.tier || "free",
             };
 
             // Delete session after retrieval (one-time use)

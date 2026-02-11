@@ -204,6 +204,9 @@ export async function processScheduledBilling(): Promise<BillingResult[]> {
                     "subscription.lastOrderId": billingResult.orderId,
                     "subscription.failureCount": 0,
                     "subscription.lastFailureReason": null,
+                    aiCallUsage: 0,
+                    usageResetAt:
+                        billingResult.approvedAt || new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                 });
 

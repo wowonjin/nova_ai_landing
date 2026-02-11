@@ -4,6 +4,20 @@ import {
     validatePaymentAmount,
     logPaymentError,
 } from "@/lib/paymentErrors";
+import { inferPlanFromAmount } from "@/lib/userData";
+import { savePaymentRecord } from "@/lib/paymentHistory";
+
+function extractUserIdFromCustomerKey(customerKey?: string | null): string | null {
+    if (!customerKey) return null;
+    if (customerKey.startsWith("user_")) {
+        return customerKey.slice("user_".length) || null;
+    }
+    const customerMatch = customerKey.match(/^customer_(.+)_\d+$/);
+    if (customerMatch?.[1]) {
+        return customerMatch[1];
+    }
+    return null;
+}
 
 /**
  * Toss Payments Confirm API
@@ -12,7 +26,8 @@ import {
  */
 export async function POST(request: NextRequest) {
     try {
-        const { paymentKey, orderId, amount } = await request.json();
+        const { paymentKey, orderId, amount, userId: passedUserId } =
+            await request.json();
 
         /* ------------------ 1. 기본 검증 ------------------ */
         if (!paymentKey || !orderId || !amount) {
@@ -77,6 +92,55 @@ export async function POST(request: NextRequest) {
                 data?.code === "ALREADY_PROCESSED_PAYMENT" ||
                 data?.message?.includes("기존 요청을 처리중")
             ) {
+                const resolvedUserId = passedUserId || null;
+                if (resolvedUserId) {
+                    try {
+                        const numericAmount = Number(amount);
+                        const inferredPlan = inferPlanFromAmount(
+                            numericAmount,
+                            "monthly",
+                        );
+                        const plan =
+                            inferredPlan === "plus" ||
+                            inferredPlan === "pro" ||
+                            inferredPlan === "test"
+                                ? inferredPlan
+                                : null;
+
+                        if (plan) {
+                            const { saveSubscription } = await import(
+                                "@/lib/subscription"
+                            );
+                            await saveSubscription(resolvedUserId, {
+                                plan: plan as any,
+                                amount: numericAmount,
+                                startDate: new Date().toISOString(),
+                                lastPaymentDate: new Date().toISOString(),
+                                status: "active",
+                                isRecurring: false,
+                            } as any, {
+                                resetUsageAt: new Date().toISOString(),
+                            });
+                        }
+
+                        await savePaymentRecord(resolvedUserId, {
+                            paymentKey,
+                            orderId,
+                            amount: numericAmount,
+                            orderName: "",
+                            method: "카드",
+                            status: "DONE",
+                            approvedAt: new Date().toISOString(),
+                            card: null,
+                        });
+                    } catch (recoveryErr) {
+                        console.error(
+                            "Failed to recover already-processed payment data:",
+                            recoveryErr,
+                        );
+                    }
+                }
+
                 return NextResponse.json({
                     success: true,
                     data: {
@@ -111,29 +175,48 @@ export async function POST(request: NextRequest) {
         try {
             const customerKey = data?.customerKey;
             const totalAmount = Number(data?.totalAmount ?? data?.amount ?? 0);
-            if (customerKey) {
-                const userId = (customerKey || "").split("_")[1] || null;
-                if (userId) {
-                    // map amount to plan
-                    let plan: "plus" | "pro" | null = null;
-                    if (totalAmount >= 49900) {
-                        plan = "pro";
-                    } else if (totalAmount >= 19900) {
-                        plan = "plus";
-                    }
-                    if (plan) {
-                        const { saveSubscription } =
-                            await import("@/lib/subscription");
-                        await saveSubscription(userId, {
-                            plan: plan as any,
-                            amount: totalAmount,
-                            startDate: new Date().toISOString(),
-                            status: "active",
-                            customerKey,
-                            isRecurring: false, // confirmed as one-time via payment.confirm
-                        });
-                    }
+            const resolvedUserId =
+                passedUserId || extractUserIdFromCustomerKey(customerKey);
+            if (resolvedUserId) {
+                // map amount to plan
+                const inferredPlan = inferPlanFromAmount(totalAmount, "monthly");
+                const plan =
+                    inferredPlan === "plus" ||
+                    inferredPlan === "pro" ||
+                    inferredPlan === "test"
+                        ? inferredPlan
+                        : null;
+                if (plan) {
+                    const { saveSubscription } = await import("@/lib/subscription");
+                    await saveSubscription(resolvedUserId, {
+                        plan: plan as any,
+                        amount: totalAmount,
+                        startDate: new Date().toISOString(),
+                        lastPaymentDate: new Date().toISOString(),
+                        status: "active",
+                        customerKey,
+                        isRecurring: false, // confirmed as one-time via payment.confirm
+                    } as any, {
+                        resetUsageAt: new Date().toISOString(),
+                    });
                 }
+
+                await savePaymentRecord(resolvedUserId, {
+                    paymentKey: data?.paymentKey || paymentKey,
+                    orderId: data?.orderId || orderId,
+                    amount: totalAmount,
+                    orderName: data?.orderName || "",
+                    method: data?.method || "카드",
+                    status: "DONE",
+                    approvedAt:
+                        data?.approvedAt || data?.requestedAt || new Date().toISOString(),
+                    card: data?.card
+                        ? {
+                              company: data.card.company || null,
+                              number: data.card.number || null,
+                          }
+                        : null,
+                });
             }
         } catch (err) {
             console.error("Failed to update subscription after confirm:", err);

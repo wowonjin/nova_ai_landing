@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { buildUserRootPatch } from "@/lib/userData";
 
 interface ExchangeRequest {
     code?: string;
@@ -111,21 +112,25 @@ export async function POST(req: Request) {
             // Persist profile to Firestore
             try {
                 const db = admin.firestore();
-                await db
-                    .collection("users")
-                    .doc(uid)
-                    .set(
-                        {
+                const userRef = db.collection("users").doc(uid);
+                const existingUser = await userRef.get();
+                await userRef.set(
+                    buildUserRootPatch({
+                        existingUser: existingUser.exists
+                            ? (existingUser.data() as Record<string, unknown>)
+                            : undefined,
+                        profile: {
                             avatar:
                                 kakaoAccount?.profile?.profile_image_url ||
                                 null,
                             displayName:
                                 kakaoAccount?.profile?.nickname || null,
                             email: kakaoAccount?.email || null,
-                            createdAt: Date.now(),
                         },
-                        { merge: true }
-                    );
+                        plan: "free",
+                    }),
+                    { merge: true }
+                );
             } catch (err: any) {
                 console.warn(
                     "[KAKAO exchange] Failed to persist profile to Firestore",

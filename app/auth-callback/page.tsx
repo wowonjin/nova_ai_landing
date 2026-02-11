@@ -8,6 +8,7 @@ interface UserInfo {
     email: string | null;
     photo_url: string | null;
     tier: string | null;
+    plan: string | null;
 }
 
 export default function AuthCallback() {
@@ -83,6 +84,7 @@ function AuthCallbackContent({
         const email = searchParams?.get("email") ?? null;
         const photoUrl = searchParams?.get("photo_url") ?? null;
         const tier = searchParams?.get("tier") ?? null;
+        const plan = searchParams?.get("plan") ?? tier ?? null;
         const redirectUri = searchParams?.get("redirect_uri") ?? null;
         const sessionId = searchParams?.get("session") ?? null;
 
@@ -92,7 +94,8 @@ function AuthCallbackContent({
                 name,
                 email,
                 photo_url: photoUrl,
-                tier,
+                tier: tier ?? plan,
+                plan,
             };
             setUserInfo(info);
             setShowInfo(true);
@@ -118,7 +121,8 @@ function AuthCallbackContent({
                         name,
                         email,
                         photoUrl,
-                        tier,
+                        tier: tier ?? plan,
+                        plan,
                     }),
                 })
                     .then((response) => {
@@ -167,7 +171,8 @@ function AuthCallbackContent({
                 if (email) redirectUrl.searchParams.set("email", email);
                 if (photoUrl)
                     redirectUrl.searchParams.set("photo_url", photoUrl);
-                if (tier) redirectUrl.searchParams.set("tier", tier);
+                if (tier ?? plan) redirectUrl.searchParams.set("tier", tier ?? plan);
+                if (plan) redirectUrl.searchParams.set("plan", plan);
 
                 window.location.href = redirectUrl.toString();
                 return;
@@ -289,6 +294,14 @@ function AuthCallbackContent({
                                     </span>
                                     <span className="text-gray-900 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium w-fit">
                                         {userInfo.tier || "N/A"}
+                                    </span>
+                                </div>
+                                <div className="flex items-start">
+                                    <span className="font-semibold text-gray-700 w-24">
+                                        Plan:
+                                    </span>
+                                    <span className="text-gray-900 px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium w-fit">
+                                        {userInfo.plan || "N/A"}
                                     </span>
                                 </div>
                             </div>

@@ -4,6 +4,75 @@
     padding-top: 1rem;
 }
 
+.admin-header {
+    margin: 0 2rem 1rem;
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    border: 1px solid #27272a;
+    background: #18181b;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.admin-header-text h1 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.admin-header-text p {
+    margin: 0.25rem 0 0;
+    font-size: 0.875rem;
+    color: #a1a1aa;
+}
+
+.admin-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.admin-home-btn {
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    border: 1px solid #3b82f6;
+    background: transparent;
+    color: #93c5fd;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.admin-home-btn:hover {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: #60a5fa;
+    color: #bfdbfe;
+}
+
+.admin-logout-btn {
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    border: 1px solid #3f3f46;
+    background: transparent;
+    color: #ffffff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.admin-logout-btn:hover {
+    background: #27272a;
+    border-color: #52525b;
+}
+
 .admin-nav {
     display: flex;
     gap: 0;
@@ -380,6 +449,13 @@
 @media (max-width: 768px) {
     .admin-header {
         padding: 1rem;
+        margin: 0 1rem 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .admin-header-actions {
+        width: 100%;
     }
 
     .admin-nav {

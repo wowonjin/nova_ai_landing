@@ -1,7 +1,9 @@
 "use client";
 
+import { MouseEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
 
 const CheckIcon = ({ color = "currentColor" }: { color?: string }) => (
     <svg
@@ -22,109 +24,220 @@ const CheckIcon = ({ color = "currentColor" }: { color?: string }) => (
 interface PricingPlan {
     name: string;
     subDescription: string;
-    price: string;
-    period: string;
+    prices: {
+        monthly: string;
+        yearly: string;
+    };
     features: string[];
     cta: string;
     popular?: boolean;
     tier: "free" | "plus" | "pro";
 }
 
+type BillingCycle = "monthly" | "yearly";
+
 const plans: PricingPlan[] = [
     {
-        name: "무료",
+        name: "Free",
         subDescription: "제한적인 AI 생성과 기본 기능을 제공합니다.",
-        price: "0",
-        period: "/월",
+        prices: {
+            monthly: "0",
+            yearly: "0",
+        },
         features: [
             "하루 5회 AI 생성",
             "기본 수식 자동화",
             "광고 없는 경험",
             "커뮤니티 지원",
             "AI 코드 생성",
+            "복수 계정 작업 불가능",
         ],
         cta: "무료로 시작하기",
         tier: "free",
     },
     {
-        name: "플러스 요금제",
+        name: "Plus 요금제",
         subDescription: "더 많은 기능과 우선 지원을 받으세요.",
-        price: "19,900",
-        period: "/월",
+        prices: {
+            monthly: "100",
+            yearly: "60",
+        },
         features: [
-            "월 220회 AI 생성",
+            "월 300회+30회 AI 생성",
             "고급 AI 모델",
             "팀 공유 기능",
             "우선 지원 서비스",
             "월 1회 1:1 컨설팅",
+            "복수 계정 작업 불가능",
         ],
-        cta: "플러스 시작하기",
+        cta: "Plus 시작하기",
         popular: true,
         tier: "plus",
     },
     {
-        name: "프로 요금제",
-        subDescription: "모든 프리미엄 기능을 사용하세요.",
-        price: "49,900",
-        period: "/월",
+        name: "Ultra 요금제",
+        subDescription: "멀티 로그인이 가능합니다",
+        prices: {
+            monthly: "99,000",
+            yearly: "59,400",
+        },
         features: [
-            "월 660회 AI 생성",
+            "월 2000+200회 AI 생성",
             "팀 협업 기능",
             "API 액세스",
             "전담 지원 서비스",
             "최우선 업데이트",
+            "복수 계정 작업 가능",
         ],
-        cta: "프로 시작하기",
+        cta: "Ultra 시작하기",
         tier: "pro",
     },
 ];
 
 export default function Pricing() {
     const router = useRouter();
-    const { isAuthenticated, loading } = useAuth();
+    const { isAuthenticated, loading, user } = useAuth();
+    const [isPaying, setIsPaying] = useState(false);
+    const [billingCycle, setBillingCycle] = useState<BillingCycle>("yearly");
 
-    const paymentMetaByTier: Record<"plus" | "pro", { amount: number; orderName: string }> = {
-        plus: { amount: 19900, orderName: "Nova AI 플러스 요금제" },
-        pro: { amount: 49900, orderName: "Nova AI 프로 요금제" },
+    const paymentMetaByTier: Record<
+        "plus" | "pro",
+        Record<BillingCycle, { amount: number; orderName: string }>
+    > = {
+        plus: {
+            monthly: { amount: 100, orderName: "Nova AI Plus 요금제 (월간 결제)" },
+            yearly: {
+                amount: 720,
+                orderName: "Nova AI Plus 요금제 (연간 결제, 월 40% 할인 적용)",
+            },
+        },
+        pro: {
+            monthly: { amount: 99000, orderName: "Nova AI Ultra 요금제 (월간 결제)" },
+            yearly: {
+                amount: 712800,
+                orderName: "Nova AI Ultra 요금제 (연간 결제, 월 40% 할인 적용)",
+            },
+        },
     };
 
-    const handlePlanClick = (tier: PricingPlan["tier"]) => {
+    const billingLabel = "/월";
+
+    const handlePlanClick = async (
+        event: MouseEvent<HTMLButtonElement>,
+        tier: PricingPlan["tier"],
+    ) => {
+        event.preventDefault();
+
         if (tier === "free") {
             router.push("/login");
             return;
         }
 
-        if (loading) return;
+        if (loading || isPaying) return;
 
-        const paymentMeta = paymentMetaByTier[tier];
-        const paymentParams = new URLSearchParams({
-            amount: String(paymentMeta.amount),
-            orderName: paymentMeta.orderName,
-        });
+        const paymentMeta = paymentMetaByTier[tier][billingCycle];
 
         if (!isAuthenticated) {
             const loginParams = new URLSearchParams({
                 postLoginAction: "payment",
                 amount: String(paymentMeta.amount),
                 orderName: paymentMeta.orderName,
+                billingCycle,
             });
             router.push(`/login?${loginParams.toString()}`);
             return;
         }
 
-        router.push(`/?openPayment=true&${paymentParams.toString()}`);
+        if (!user?.uid) {
+            window.alert("로그인 정보를 확인한 후 다시 시도해주세요.");
+            return;
+        }
+
+        try {
+            setIsPaying(true);
+
+            const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY?.trim() || "";
+
+            if (
+                !clientKey.startsWith("test_ck_") &&
+                !clientKey.startsWith("live_ck_")
+            ) {
+                window.alert(
+                    "토스 결제 클라이언트 키 형식이 올바르지 않습니다. NEXT_PUBLIC_TOSS_CLIENT_KEY를 확인해주세요.",
+                );
+                return;
+            }
+
+            const tossPayments = await loadTossPayments(clientKey);
+            const payment = tossPayments.payment({
+                customerKey: `user_${user.uid
+                    .replace(/[^a-zA-Z0-9\-_=.@]/g, "")
+                    .substring(0, 40)}`,
+            });
+
+            await payment.requestPayment({
+                method: "CARD",
+                amount: {
+                    value: paymentMeta.amount,
+                    currency: "KRW",
+                },
+                orderId: `order_${Date.now()}`,
+                orderName: paymentMeta.orderName,
+                successUrl: `${window.location.origin}/payment/success?billingCycle=${billingCycle}&uid=${encodeURIComponent(user.uid)}`,
+                failUrl: `${window.location.origin}/payment/fail?billingCycle=${billingCycle}`,
+                customerEmail: user.email || "test@example.com",
+                customerName: user.displayName || "고객",
+            });
+        } catch (error: any) {
+            window.alert(error?.message || "결제 요청 중 오류가 발생했습니다.");
+        } finally {
+            setIsPaying(false);
+        }
     };
 
     return (
         <section id="pricing" className="pricing-section">
             <div className="section-inner">
                 <div className="pricing-header">
-                    <h2 className="pricing-title">이용요금 안내</h2>
+                    <h2 className="pricing-title">이용 요금 안내</h2>
                     <p className="pricing-subtitle">
                         합리적인 가격으로 강력한 AI 기능을 경험하세요.
                         <br />
                         필요에 맞는 요금제를 선택하고 지금 바로 시작하세요.
                     </p>
+                    <div className="pricing-billing-toggle" role="tablist" aria-label="결제 주기 선택">
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={billingCycle === "monthly"}
+                            className={`pricing-billing-toggle__btn ${
+                                billingCycle === "monthly"
+                                    ? "pricing-billing-toggle__btn--active"
+                                    : ""
+                            }`}
+                            onClick={() => setBillingCycle("monthly")}
+                        >
+                            월간 결제
+                        </button>
+                        <div className="pricing-billing-toggle__annual-wrap">
+                            <span className="pricing-billing-toggle__discount-badge">
+                                40% 할인
+                            </span>
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={billingCycle === "yearly"}
+                                className={`pricing-billing-toggle__btn ${
+                                    billingCycle === "yearly"
+                                        ? "pricing-billing-toggle__btn--active"
+                                        : ""
+                                }`}
+                                onClick={() => setBillingCycle("yearly")}
+                            >
+                                연간 결제
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="pricing-cards-wrapper">
@@ -135,43 +248,53 @@ export default function Pricing() {
                                 plan.popular ? "pricing-card-v2--popular" : ""
                             }`}
                         >
-                            {plan.popular && (
-                                <div className="pricing-badge-v2">
-                                    <span>BEST</span>
-                                </div>
-                            )}
-
                             <div className="pricing-card-v2__content">
                                 <div className="pricing-card-v2__header">
-                                    <h3 className="pricing-card-v2__name">
-                                        {plan.name}
-                                    </h3>
-                                    <p className="pricing-card-v2__desc">
-                                        {plan.subDescription}
-                                    </p>
+                                    <div className="pricing-card-v2__title-row">
+                                        <h3 className="pricing-card-v2__name">
+                                            {plan.name}
+                                        </h3>
+                                        {plan.popular && (
+                                            <div className="pricing-badge-v2">
+                                                <span>BEST</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="pricing-card-v2__price-block">
                                     <div className="pricing-card-v2__price-row">
-                                        {plan.price !== "0" && (
+                                        {plan.prices[billingCycle] !== "0" && (
                                             <span className="pricing-card-v2__currency">
                                                 ₩
                                             </span>
                                         )}
                                         <span className="pricing-card-v2__price">
-                                            {plan.price === "0"
-                                                ? "무료"
-                                                : plan.price}
+                                            {plan.prices[billingCycle] === "0"
+                                                ? "Free"
+                                                : plan.prices[billingCycle]}
                                         </span>
-                                        {plan.price !== "0" && (
+                                        {plan.prices[billingCycle] !== "0" && (
                                             <span className="pricing-card-v2__unit">
-                                                {plan.period}
+                                                {billingLabel}
                                             </span>
                                         )}
                                     </div>
                                 </div>
 
-                                <div className="pricing-card-v2__divider" />
+                                <div className="pricing-card-v2__cta-wrap">
+                                    <button
+                                        type="button"
+                                        onClick={(event) => handlePlanClick(event, plan.tier)}
+                                        className={`pricing-cta-v2 pricing-cta-v2--${plan.tier}`}
+                                    >
+                                        {plan.cta}
+                                    </button>
+                                </div>
+
+                                <p className="pricing-card-v2__desc">
+                                    {plan.subDescription}
+                                </p>
 
                                 <ul className="pricing-card-v2__features">
                                     {plan.features.map((feature, i) => (
@@ -193,13 +316,6 @@ export default function Pricing() {
                                     ))}
                                 </ul>
                             </div>
-
-                            <button
-                                onClick={() => handlePlanClick(plan.tier)}
-                                className={`pricing-cta-v2 pricing-cta-v2--${plan.tier}`}
-                            >
-                                {plan.cta}
-                            </button>
                         </div>
                     ))}
                 </div>

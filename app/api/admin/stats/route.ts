@@ -5,10 +5,34 @@ import { verifyAdmin, admin } from "@/lib/adminAuth";
 
 const db = admin.firestore();
 
+function getDateKey(date = new Date()) {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    });
+    return formatter.format(date);
+}
+
+async function getAuthUserCount(): Promise<number> {
+    let pageToken: string | undefined = undefined;
+    let total = 0;
+
+    do {
+        const result = await admin.auth().listUsers(1000, pageToken);
+        total += result.users.length;
+        pageToken = result.pageToken;
+    } while (pageToken);
+
+    return total;
+}
+
 function getEmptyStats() {
     return {
         dailyVisitors: 0,
         dailyDownloads: 0,
+        todaySales: 0,
         totalSignups: 0,
         dailyRevenue: [],
         totalUsers: 0,
@@ -51,7 +75,7 @@ export async function GET(request: NextRequest) {
 
     try {
         const usersRef = db.collection("users");
-        const todayKey = new Date().toISOString().slice(0, 10);
+        const todayKey = getDateKey();
         const todayAnalyticsRef = db.collection("analyticsDaily").doc(todayKey);
 
         // Get all users
@@ -59,7 +83,8 @@ export async function GET(request: NextRequest) {
             usersRef.get(),
             todayAnalyticsRef.get(),
         ]);
-        const totalUsers = usersSnapshot.size;
+        const authUserCount = await getAuthUserCount();
+        const totalUsers = authUserCount || usersSnapshot.size;
         const totalSignups = totalUsers;
         const dailyVisitors = todayAnalyticsSnap.exists
             ? (todayAnalyticsSnap.data()?.visitors ?? 0)
@@ -114,6 +139,16 @@ export async function GET(request: NextRequest) {
             }
         });
 
+        // Firestore users 문서가 누락된 Auth 사용자 수를 free로 보정
+        const missingFirestoreUsers = Math.max(
+            authUserCount - usersSnapshot.size,
+            0,
+        );
+        if (missingFirestoreUsers > 0) {
+            freeUsers += missingFirestoreUsers;
+            planCounts.free += missingFirestoreUsers;
+        }
+
         // Get recent payments (last 30 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -122,6 +157,7 @@ export async function GET(request: NextRequest) {
         let recentPaymentsTotal = 0;
         let recentRefundsCount = 0;
         let recentRefundsTotal = 0;
+        let todaySales = 0;
         const dailyRevenueMap: Record<
             string,
             { totalSales: number; paymentCount: number }
@@ -142,16 +178,26 @@ export async function GET(request: NextRequest) {
                 if (payment.status === "DONE") {
                     recentPaymentsCount++;
                     recentPaymentsTotal += payment.amount || 0;
-                    const dateKey = String(payment.approvedAt || "").slice(0, 10);
+                    const approvedAt = payment.approvedAt
+                        ? new Date(payment.approvedAt)
+                        : null;
+                    const dateKey =
+                        approvedAt && !Number.isNaN(approvedAt.getTime())
+                            ? getDateKey(approvedAt)
+                            : "";
                     if (dateKey) {
                         const prev = dailyRevenueMap[dateKey] || {
                             totalSales: 0,
                             paymentCount: 0,
                         };
+                        const amount = payment.amount || 0;
                         dailyRevenueMap[dateKey] = {
-                            totalSales: prev.totalSales + (payment.amount || 0),
+                            totalSales: prev.totalSales + amount,
                             paymentCount: prev.paymentCount + 1,
                         };
+                        if (dateKey === todayKey) {
+                            todaySales += amount;
+                        }
                     }
                 } else if (payment.status === "REFUNDED") {
                     recentRefundsCount++;
@@ -171,6 +217,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             dailyVisitors,
             dailyDownloads,
+            todaySales,
             totalSignups,
             dailyRevenue,
             totalUsers,

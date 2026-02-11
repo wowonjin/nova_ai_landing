@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 // Lazily import the firebase-admin initializer to avoid throwing during cold-start when creds are not available.
 import getFirebaseAdmin from "@/lib/firebaseAdmin";
+import { buildUserRootPatch } from "@/lib/userData";
 
 export async function GET(req: Request) {
     const url = new URL(req.url);
@@ -167,21 +168,25 @@ export async function GET(req: Request) {
         // Persist profile to Firestore so client can read email/name right away
         try {
             const db = admin.firestore();
-            await db
-                .collection("users")
-                .doc(uid)
-                .set(
-                    {
+            const userRef = db.collection("users").doc(uid);
+            const existingUser = await userRef.get();
+            await userRef.set(
+                buildUserRootPatch({
+                    existingUser: existingUser.exists
+                        ? (existingUser.data() as Record<string, unknown>)
+                        : undefined,
+                    profile: {
                         avatar: profile?.response?.profile_image || null,
                         displayName:
                             profile?.response?.name ||
                             profile?.response?.nickname ||
                             null,
                         email: profile?.response?.email || null,
-                        createdAt: Date.now(),
                     },
-                    { merge: true },
-                );
+                    plan: "free",
+                }),
+                { merge: true },
+            );
         } catch (err: any) {
             console.warn(
                 "[NAVER callback] Failed to persist profile to Firestore",

@@ -3,8 +3,36 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdmin, admin } from "@/lib/adminAuth";
 import { getTierLimit, PlanTier } from "@/lib/tierLimits";
+import { normalizeCreatedAt } from "@/lib/userData";
 
 const db = admin.firestore();
+
+async function listAllAuthUsers() {
+    let pageToken: string | undefined = undefined;
+    const users: Array<{
+        uid: string;
+        email: string;
+        displayName: string;
+        photoURL: string;
+        createdAt: string;
+    }> = [];
+
+    do {
+        const result = await admin.auth().listUsers(1000, pageToken);
+        result.users.forEach((user) => {
+            users.push({
+                uid: user.uid,
+                email: user.email || "",
+                displayName: user.displayName || "",
+                photoURL: user.photoURL || "",
+                createdAt: normalizeCreatedAt(user.metadata.creationTime),
+            });
+        });
+        pageToken = result.pageToken;
+    } while (pageToken);
+
+    return users;
+}
 
 interface AdminUserListItem {
     uid: string;
@@ -12,6 +40,7 @@ interface AdminUserListItem {
     displayName: string;
     photoURL: string;
     createdAt: string;
+    cumulativeAmount: number;
     subscription: {
         plan: string;
         status: string;
@@ -53,48 +82,29 @@ export async function GET(request: NextRequest) {
         const statusFilter = searchParams.get("status");
 
         const usersRef = db.collection("users");
-        const usersSnapshot = await usersRef.get();
+        const [usersSnapshot, authUsers] = await Promise.all([
+            usersRef.get(),
+            listAllAuthUsers(),
+        ]);
 
-        let users: AdminUserListItem[] = [];
+        const mergedUsers = new Map<string, AdminUserListItem>();
 
         usersSnapshot.forEach((doc) => {
             const data = doc.data();
             const subscription = data.subscription || {};
-
-            // Apply filters
-            const email = data.email?.toLowerCase() || "";
-            const displayName = data.displayName?.toLowerCase() || "";
             const plan = (subscription.plan || data.plan || "free") as PlanTier;
-            const status = subscription.status || "none";
+            const status = String(subscription.status || "none");
             const todayUsage = data.aiCallUsage || 0;
             const usageLimit = getTierLimit(plan);
             const remainingUsage = Math.max(0, usageLimit - todayUsage);
 
-            // Search filter
-            if (
-                search &&
-                !email.includes(search) &&
-                !displayName.includes(search)
-            ) {
-                return;
-            }
-
-            // Plan filter
-            if (planFilter && plan !== planFilter) {
-                return;
-            }
-
-            // Status filter
-            if (statusFilter && status !== statusFilter) {
-                return;
-            }
-
-            users.push({
+            mergedUsers.set(doc.id, {
                 uid: doc.id,
-                email: data.email,
-                displayName: data.displayName,
-                photoURL: data.photoURL,
-                createdAt: data.createdAt,
+                email: data.email || "",
+                displayName: data.displayName || "",
+                photoURL: data.avatar || data.photoURL || "",
+                createdAt: normalizeCreatedAt(data.createdAt),
+                cumulativeAmount: 0,
                 subscription: {
                     plan: plan,
                     status: status,
@@ -111,6 +121,84 @@ export async function GET(request: NextRequest) {
                     remaining: remainingUsage,
                 },
             });
+        });
+
+        // Firestore 문서가 없는 Auth 사용자도 관리자 목록에 노출
+        authUsers.forEach((authUser) => {
+            if (mergedUsers.has(authUser.uid)) return;
+
+            const usageLimit = getTierLimit("free");
+            mergedUsers.set(authUser.uid, {
+                uid: authUser.uid,
+                email: authUser.email,
+                displayName: authUser.displayName,
+                photoURL: authUser.photoURL,
+                createdAt: authUser.createdAt,
+                cumulativeAmount: 0,
+                subscription: {
+                    plan: "free",
+                    status: "none",
+                    amount: 0,
+                    billingCycle: "monthly",
+                    startDate: "",
+                    nextBillingDate: "",
+                    failureCount: 0,
+                },
+                usage: {
+                    today: 0,
+                    limit: usageLimit,
+                    remaining: usageLimit,
+                },
+            });
+        });
+
+        // 누적 결제 금액 계산 (DONE 상태 합계)
+        await Promise.all(
+            Array.from(mergedUsers.keys()).map(async (uid) => {
+                try {
+                    const paymentsSnapshot = await db
+                        .collection("users")
+                        .doc(uid)
+                        .collection("payments")
+                        .get();
+
+                    let cumulativeAmount = 0;
+                    paymentsSnapshot.forEach((paymentDoc) => {
+                        const payment = paymentDoc.data() as {
+                            status?: string;
+                            amount?: number;
+                        };
+                        if (payment.status === "DONE") {
+                            cumulativeAmount += Number(payment.amount || 0);
+                        }
+                    });
+
+                    const user = mergedUsers.get(uid);
+                    if (user) {
+                        user.cumulativeAmount = cumulativeAmount;
+                    }
+                } catch {
+                    // 누적 금액 계산 실패 시 0원 유지
+                }
+            }),
+        );
+
+        let users = Array.from(mergedUsers.values()).filter((user) => {
+            const email = user.email.toLowerCase();
+            const displayName = user.displayName.toLowerCase();
+            const plan = user.subscription.plan;
+            const status = user.subscription.status;
+
+            if (
+                search &&
+                !email.includes(search) &&
+                !displayName.includes(search)
+            ) {
+                return false;
+            }
+            if (planFilter && plan !== planFilter) return false;
+            if (statusFilter && status !== statusFilter) return false;
+            return true;
         });
 
         // Sort by createdAt descending

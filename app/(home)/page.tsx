@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import AOS from "aos";
 import { useRouter, useSearchParams } from "next/navigation";
+import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
 import "aos/dist/aos.css";
 import "../style.css";
 import "../mobile.css";
@@ -22,19 +23,21 @@ import Footer from "../../components/Footer";
 export default function FormuLite() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { isAuthenticated, loading } = useAuth();
-    const [paymentPopupOpen, setPaymentPopupOpen] = useState(false);
+    const { isAuthenticated, loading, user } = useAuth();
+    const paymentStartedRef = useRef(false);
 
     const pendingPayment = useMemo(() => {
         if (searchParams.get("openPayment") !== "true") return null;
         const amountRaw = searchParams.get("amount");
         const orderNameRaw = searchParams.get("orderName");
+        const billingCycleRaw = searchParams.get("billingCycle");
         if (!amountRaw || !orderNameRaw) return null;
         const amount = Number(amountRaw);
         if (Number.isNaN(amount) || amount <= 0) return null;
         return {
             amount,
             orderName: orderNameRaw,
+            billingCycle: billingCycleRaw ?? undefined,
         };
     }, [searchParams]);
 
@@ -58,6 +61,10 @@ export default function FormuLite() {
     }, []);
 
     useEffect(() => {
+        paymentStartedRef.current = false;
+    }, [pendingPayment?.amount, pendingPayment?.orderName, pendingPayment?.billingCycle]);
+
+    useEffect(() => {
         if (!pendingPayment) return;
         if (loading) return;
 
@@ -67,26 +74,59 @@ export default function FormuLite() {
                 amount: String(pendingPayment.amount),
                 orderName: pendingPayment.orderName,
             });
+            if (pendingPayment.billingCycle) {
+                loginParams.set("billingCycle", pendingPayment.billingCycle);
+            }
             router.replace(`/login?${loginParams.toString()}`);
             return;
         }
 
-        setPaymentPopupOpen(true);
-    }, [isAuthenticated, loading, pendingPayment, router]);
+        if (!user?.uid || paymentStartedRef.current) return;
+        paymentStartedRef.current = true;
 
-    const closePaymentPopup = () => {
-        setPaymentPopupOpen(false);
-        router.replace("/");
-    };
+        const startPayment = async () => {
+            try {
+                const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY?.trim() || "";
 
-    const startPayment = () => {
-        if (!pendingPayment) return;
-        const paymentParams = new URLSearchParams({
-            amount: String(pendingPayment.amount),
-            orderName: pendingPayment.orderName,
-        });
-        window.location.href = `/payment?${paymentParams.toString()}`;
-    };
+                if (
+                    !clientKey.startsWith("test_ck_") &&
+                    !clientKey.startsWith("live_ck_")
+                ) {
+                    window.alert(
+                        "토스 결제 클라이언트 키 형식이 올바르지 않습니다. NEXT_PUBLIC_TOSS_CLIENT_KEY를 확인해주세요.",
+                    );
+                    router.replace("/");
+                    return;
+                }
+
+                const tossPayments = await loadTossPayments(clientKey);
+                const payment = tossPayments.payment({
+                    customerKey: `user_${user.uid
+                        .replace(/[^a-zA-Z0-9\-_=.@]/g, "")
+                        .substring(0, 40)}`,
+                });
+
+                await payment.requestPayment({
+                    method: "CARD",
+                    amount: {
+                        value: pendingPayment.amount,
+                        currency: "KRW",
+                    },
+                    orderId: `order_${Date.now()}`,
+                    orderName: pendingPayment.orderName,
+                    successUrl: `${window.location.origin}/payment/success?uid=${encodeURIComponent(user.uid)}`,
+                    failUrl: `${window.location.origin}/payment/fail`,
+                    customerEmail: user.email || "test@example.com",
+                    customerName: user.displayName || "고객",
+                });
+            } catch (error: any) {
+                window.alert(error?.message || "결제 요청 중 오류가 발생했습니다.");
+                router.replace("/");
+            }
+        };
+
+        void startPayment();
+    }, [isAuthenticated, loading, pendingPayment, router, user]);
 
     return (
         <div>
@@ -101,88 +141,6 @@ export default function FormuLite() {
             <FAQ />
             <CTA />
             <Footer />
-            {paymentPopupOpen && pendingPayment && (
-                <div style={overlayStyle} role="dialog" aria-modal="true">
-                    <div style={modalStyle}>
-                        <h2 style={titleStyle}>결제를 진행할까요?</h2>
-                        <p style={descStyle}>
-                            <strong>{pendingPayment.orderName}</strong>
-                            <br />
-                            {pendingPayment.amount.toLocaleString()}원
-                        </p>
-                        <div style={actionsStyle}>
-                            <button style={secondaryBtnStyle} onClick={closePaymentPopup}>
-                                닫기
-                            </button>
-                            <button style={primaryBtnStyle} onClick={startPayment}>
-                                결제하기
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
-
-const overlayStyle: React.CSSProperties = {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(3, 7, 18, 0.64)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1200,
-    padding: 16,
-};
-
-const modalStyle: React.CSSProperties = {
-    width: "100%",
-    maxWidth: 420,
-    borderRadius: 16,
-    background: "#0f1626",
-    border: "1px solid rgba(148, 163, 184, 0.3)",
-    boxShadow: "0 16px 48px rgba(2, 6, 23, 0.45)",
-    padding: 24,
-    color: "#f8fafc",
-};
-
-const titleStyle: React.CSSProperties = {
-    margin: 0,
-    marginBottom: 12,
-    fontSize: 24,
-    fontWeight: 700,
-};
-
-const descStyle: React.CSSProperties = {
-    margin: 0,
-    marginBottom: 20,
-    color: "#cbd5e1",
-    lineHeight: 1.5,
-};
-
-const actionsStyle: React.CSSProperties = {
-    display: "flex",
-    gap: 10,
-};
-
-const baseBtnStyle: React.CSSProperties = {
-    flex: 1,
-    borderRadius: 10,
-    padding: "12px 14px",
-    fontWeight: 700,
-    cursor: "pointer",
-    border: "none",
-};
-
-const secondaryBtnStyle: React.CSSProperties = {
-    ...baseBtnStyle,
-    background: "#1e293b",
-    color: "#e2e8f0",
-};
-
-const primaryBtnStyle: React.CSSProperties = {
-    ...baseBtnStyle,
-    background: "#4f46e5",
-    color: "#ffffff",
-};

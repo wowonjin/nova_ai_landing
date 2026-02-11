@@ -6,6 +6,7 @@ import {
     sendPaymentReceipt,
     sendPaymentFailureNotification,
 } from "@/lib/email";
+import { buildUserRootPatch, inferPlanFromAmount } from "@/lib/userData";
 
 /**
  * 빌링키 발급 API
@@ -87,16 +88,7 @@ export async function POST(request: NextRequest) {
 
         // 구독 정보가 있으면 활성 구독으로 설정
         // Determine plan based on amount and billing cycle
-        let plan: "free" | "plus" | "pro" | "test" = "free";
-        if (billingCycle === "test") {
-            plan = "test";
-        } else if (amount) {
-            if (amount >= 49900) {
-                plan = "pro";
-            } else if (amount >= 19900) {
-                plan = "plus";
-            }
-        }
+        const plan = inferPlanFromAmount(Number(amount || 0), billingCycle);
 
         // ═══════════════════════════════════════
         // 💰 첫 결제 실행 (빌링키로 즉시 결제)
@@ -289,15 +281,19 @@ async function saveBillingKeyToFirestore(
 
         // subscription 정보 업데이트
         await userRef.set(
-            {
-                ...existingData,
-                plan: subscriptionData.plan,
+            buildUserRootPatch({
+                existingUser: existingData as Record<string, unknown>,
                 subscription: {
                     ...(existingData.subscription || {}),
                     ...subscriptionData,
-                },
-                updatedAt: new Date().toISOString(),
-            },
+                } as Record<string, unknown>,
+                plan: subscriptionData.plan,
+                aiCallUsage: subscriptionData.lastPayment ? 0 : undefined,
+                usageResetAt: subscriptionData.lastPayment
+                    ? subscriptionData.lastPayment.approvedAt ||
+                      new Date().toISOString()
+                    : undefined,
+            }),
             { merge: true },
         );
     } catch (error: any) {

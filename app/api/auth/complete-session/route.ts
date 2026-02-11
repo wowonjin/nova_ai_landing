@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import getFirebaseAdmin from "@/lib/firebaseAdmin";
+import { normalizePlanLike } from "@/lib/userData";
 
 // Complete OAuth session with user info
 export async function POST(request: NextRequest) {
     try {
-        const { sessionId, uid, name, email, photoUrl, tier } =
+        const { sessionId, uid, name, email, photoUrl, tier, plan } =
             await request.json();
 
         console.log("Completing session:", { sessionId, uid, email });
@@ -53,6 +54,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const normalizedPlan = normalizePlanLike(plan || tier || "free", "free");
+
         // Update session with user info
         await db
             .collection("oauth_sessions")
@@ -63,7 +66,8 @@ export async function POST(request: NextRequest) {
                 name: name || null,
                 email: email || null,
                 photoUrl: photoUrl || null,
-                tier: tier || "free",
+                tier: normalizedPlan,
+                plan: normalizedPlan,
                 completedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
 

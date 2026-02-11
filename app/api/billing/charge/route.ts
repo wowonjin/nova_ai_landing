@@ -197,6 +197,8 @@ export async function PUT(request: NextRequest) {
                 lastPaymentDate: new Date().toISOString(),
                 lastOrderId: orderId,
                 failureCount: 0, // 성공 시 실패 카운트 리셋
+            }, {
+                resetUsageAt: new Date().toISOString(),
             });
 
             return NextResponse.json({
