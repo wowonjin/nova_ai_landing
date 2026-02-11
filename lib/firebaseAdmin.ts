@@ -18,23 +18,33 @@ export default function getFirebaseAdmin() {
     const serviceAccountJson = process.env.FIREBASE_ADMIN_CREDENTIALS;
     const serviceAccountB64 = process.env.FIREBASE_ADMIN_CREDENTIALS_B64;
     const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    const configuredProjectId =
+        process.env.FIREBASE_PROJECT_ID ||
+        process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
     try {
         if (serviceAccountJson) {
             // Prefer an explicit JSON string in env (useful on platforms that allow secret JSON)
             const parsed = JSON.parse(serviceAccountJson);
-            admin.initializeApp({ credential: admin.credential.cert(parsed) });
+            admin.initializeApp({
+                credential: admin.credential.cert(parsed),
+                projectId: configuredProjectId || parsed.project_id,
+            });
         } else if (serviceAccountB64) {
             // Some platforms (or CI) prefer providing base64-encoded JSON
             const json = Buffer.from(serviceAccountB64, "base64").toString(
                 "utf8"
             );
             const parsed = JSON.parse(json);
-            admin.initializeApp({ credential: admin.credential.cert(parsed) });
+            admin.initializeApp({
+                credential: admin.credential.cert(parsed),
+                projectId: configuredProjectId || parsed.project_id,
+            });
         } else {
             // Otherwise try application default credentials (may pick up GOOGLE_APPLICATION_CREDENTIALS path or ADC)
             admin.initializeApp({
                 credential: admin.credential.applicationDefault(),
+                projectId: configuredProjectId,
             });
         }
 
