@@ -40,7 +40,29 @@ export async function DELETE(
     }
 
     try {
-        // 1. Delete payments subcollection first
+        // 1) Delete from Firebase Auth first so we don't report success while auth user still exists.
+        let deletedAuthUser = false;
+        try {
+            await admin.auth().getUser(userId);
+            await admin.auth().deleteUser(userId);
+            deletedAuthUser = true;
+        } catch (authError: any) {
+            if (authError?.code !== "auth/user-not-found") {
+                console.error("Failed to delete user from Auth:", authError);
+                return NextResponse.json(
+                    {
+                        error: "Failed to delete Firebase Auth user",
+                        details:
+                            authError instanceof Error
+                                ? authError.message
+                                : String(authError),
+                    },
+                    { status: 500 },
+                );
+            }
+        }
+
+        // 2) Delete payments subcollection first
         const paymentsRef = db
             .collection("users")
             .doc(userId)
@@ -52,30 +74,24 @@ export async function DELETE(
             batch.delete(doc.ref);
         });
 
-        // 2. Delete user document from Firestore
+        // 3) Delete user document from Firestore
         batch.delete(db.collection("users").doc(userId));
 
         await batch.commit();
 
-        // 3. Delete user from Firebase Auth
-        try {
-            await admin.auth().deleteUser(userId);
-        } catch (authError: any) {
-            // User might not exist in Auth (e.g., if they signed up differently)
-            if (authError.code !== "auth/user-not-found") {
-                console.error("Failed to delete user from Auth:", authError);
-            }
-        }
-
         return NextResponse.json({
             success: true,
             message: "User deleted successfully",
+            deletedAuthUser,
             deletedPayments: paymentsSnapshot.size,
         });
     } catch (error) {
         console.error("Delete user error:", error);
         return NextResponse.json(
-            { error: "Failed to delete user" },
+            {
+                error: "Failed to delete user",
+                details: error instanceof Error ? error.message : String(error),
+            },
             { status: 500 },
         );
     }
