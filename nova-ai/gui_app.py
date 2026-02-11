@@ -2149,10 +2149,11 @@ class NovaAILiteWindow(QWidget):
         path = self._save_clipboard_image()
         if not path:
             return False
+        before_count = len(self.selected_images)
         new_paths = list(self.selected_images)
         new_paths.append(path)
         self._set_selected_images(new_paths)
-        return True
+        return len(self.selected_images) > before_count
 
     def eventFilter(self, obj, event):  # type: ignore[override]
         try:
@@ -2249,7 +2250,16 @@ class NovaAILiteWindow(QWidget):
         self._render_order_list()
 
     def _set_selected_images(self, file_paths: list[str]) -> None:
-        self.selected_images = [path for path in file_paths if path]
+        next_images = [path for path in file_paths if path]
+        if next_images and not is_logged_in():
+            QMessageBox.information(
+                self,
+                "로그인 필요",
+                "이미지를 넣으려면 먼저 로그인해야 이용 가능합니다.",
+            )
+            return
+
+        self.selected_images = next_images
         self._update_send_button_state()
         if not self.selected_images:
             self.order_list.clear()

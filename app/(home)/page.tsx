@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import AOS from "aos";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
@@ -20,7 +20,7 @@ import CTA from "../../components/CTA";
 import { Navbar } from "../../components/Navbar";
 import Footer from "../../components/Footer";
 
-export default function FormuLite() {
+function FormuLiteContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { isAuthenticated, loading, user } = useAuth();
@@ -142,5 +142,13 @@ export default function FormuLite() {
             <CTA />
             <Footer />
         </div>
+    );
+}
+
+export default function FormuLite() {
+    return (
+        <Suspense fallback={null}>
+            <FormuLiteContent />
+        </Suspense>
     );
 }

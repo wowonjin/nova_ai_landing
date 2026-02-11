@@ -1,6 +1,6 @@
 """
 OAuth Desktop Flow for Nova AI
-Handles browser-based OAuth login via https://nova-ai.work/login
+Handles browser-based OAuth login via configured web app login URL.
 """
 from __future__ import annotations
 
@@ -15,7 +15,12 @@ from urllib.parse import urlparse, parse_qs
 from typing import Optional, Dict, Any
 
 # Login page URL
-LOGIN_URL = "https://nova-ai.work/login"
+# Override with NOVA_WEB_BASE_URL when needed (e.g. staging/preview).
+WEB_BASE_URL = os.getenv(
+    "NOVA_WEB_BASE_URL",
+    "https://formulite-landing-main.vercel.app",
+).rstrip("/")
+LOGIN_URL = f"{WEB_BASE_URL}/login"
 CALLBACK_PORT = 8765
 CALLBACK_PATH = "/auth-callback"
 
@@ -170,38 +175,205 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                     <meta charset="utf-8">
                     <title>로그인 성공</title>
                     <style>
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
                         body {
                             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                             display: flex;
                             justify-content: center;
                             align-items: center;
                             height: 100vh;
-                            margin: 0;
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            background: #0a0a0f;
                             color: white;
+                            overflow: hidden;
                         }
+
+                        /* Ambient background glows */
+                        .bg-glow-1 {
+                            position: fixed;
+                            top: 50%; left: 50%;
+                            transform: translate(-50%, -50%);
+                            width: 500px; height: 500px;
+                            border-radius: 50%;
+                            background: radial-gradient(circle, rgba(99,102,241,0.18) 0%, rgba(139,92,246,0.12) 40%, transparent 70%);
+                            filter: blur(80px);
+                            pointer-events: none;
+                        }
+                        .bg-glow-2 {
+                            position: fixed;
+                            top: 25%; right: 25%;
+                            width: 250px; height: 250px;
+                            border-radius: 50%;
+                            background: radial-gradient(circle, rgba(6,182,212,0.1) 0%, transparent 70%);
+                            filter: blur(60px);
+                            pointer-events: none;
+                        }
+
+                        /* Grid overlay */
+                        .bg-grid {
+                            position: fixed;
+                            inset: 0;
+                            opacity: 0.03;
+                            background-image:
+                                linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                                linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+                            background-size: 60px 60px;
+                            pointer-events: none;
+                        }
+
                         .container {
+                            position: relative;
+                            z-index: 1;
                             text-align: center;
-                            padding: 40px;
-                            background: rgba(255,255,255,0.1);
-                            border-radius: 20px;
-                            backdrop-filter: blur(10px);
+                            max-width: 400px;
+                            width: 100%;
+                            padding: 0 24px;
                         }
-                        h1 { font-size: 2em; margin-bottom: 10px; }
-                        p { font-size: 1.2em; opacity: 0.9; }
-                        .checkmark {
-                            font-size: 4em;
-                            margin-bottom: 20px;
+
+                        /* Success icon */
+                        .icon-wrapper {
+                            position: relative;
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            margin-bottom: 32px;
                         }
+                        .icon-ring {
+                            position: absolute;
+                            width: 112px; height: 112px;
+                            border-radius: 50%;
+                            border: 1px solid rgba(16,185,129,0.25);
+                            animation: ringPulse 2.5s ease-out infinite;
+                        }
+                        .icon-circle {
+                            width: 88px; height: 88px;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            background: linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(99,102,241,0.15) 100%);
+                            border: 1px solid rgba(16,185,129,0.25);
+                            box-shadow: 0 0 40px rgba(16,185,129,0.12), inset 0 1px 0 rgba(255,255,255,0.04);
+                            animation: scaleIn 0.4s ease-out forwards;
+                        }
+                        .icon-circle svg {
+                            width: 38px; height: 38px;
+                            filter: drop-shadow(0 0 8px rgba(16,185,129,0.5));
+                        }
+                        .check-path {
+                            stroke-dasharray: 24;
+                            stroke-dashoffset: 24;
+                            animation: checkDraw 0.6s ease-out 0.3s forwards;
+                        }
+
+                        /* Text */
+                        h1 {
+                            font-size: 2rem;
+                            font-weight: 600;
+                            letter-spacing: -0.02em;
+                            margin-bottom: 10px;
+                            background: linear-gradient(90deg, #e2e8f0 0%, #f8fafc 50%, #e2e8f0 100%);
+                            background-size: 200% auto;
+                            -webkit-background-clip: text;
+                            -webkit-text-fill-color: transparent;
+                            background-clip: text;
+                            animation: fadeUp 0.5s ease-out 0.6s both, shimmer 3s linear 1.1s infinite;
+                        }
+                        .subtitle {
+                            font-size: 1rem;
+                            color: #9ca3af;
+                            font-weight: 300;
+                            animation: fadeUp 0.5s ease-out 0.8s both;
+                        }
+
+                        /* Countdown badge */
+                        .countdown-badge {
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 8px;
+                            margin-top: 28px;
+                            padding: 8px 18px;
+                            border-radius: 999px;
+                            background: rgba(255,255,255,0.04);
+                            border: 1px solid rgba(255,255,255,0.08);
+                            animation: fadeUp 0.5s ease-out 1.0s both;
+                        }
+                        .countdown-dot {
+                            width: 6px; height: 6px;
+                            border-radius: 50%;
+                            background: #10b981;
+                            animation: pulse 1.5s ease-in-out infinite;
+                        }
+                        .countdown-text {
+                            font-size: 0.75rem;
+                            color: #9ca3af;
+                            font-family: 'SF Mono', 'Fira Code', monospace;
+                        }
+
+                        /* Animations */
+                        @keyframes checkDraw {
+                            0% { stroke-dashoffset: 24; opacity: 0; }
+                            40% { opacity: 1; }
+                            100% { stroke-dashoffset: 0; opacity: 1; }
+                        }
+                        @keyframes scaleIn {
+                            0% { transform: scale(0.7); opacity: 0; }
+                            100% { transform: scale(1); opacity: 1; }
+                        }
+                        @keyframes fadeUp {
+                            0% { transform: translateY(14px); opacity: 0; }
+                            100% { transform: translateY(0); opacity: 1; }
+                        }
+                        @keyframes ringPulse {
+                            0% { transform: scale(1); opacity: 0.4; }
+                            100% { transform: scale(1.7); opacity: 0; }
+                        }
+                        @keyframes shimmer {
+                            0% { background-position: -200% center; }
+                            100% { background-position: 200% center; }
+                        }
+                        @keyframes pulse {
+                            0%, 100% { opacity: 1; }
+                            50% { opacity: 0.4; }
+                        }
+                        @keyframes countdownTick {
+                            0% { transform: scale(1); }
+                            50% { transform: scale(1.2); }
+                            100% { transform: scale(1); }
+                        }
+                        .tick { animation: countdownTick 0.3s ease-out; }
                     </style>
                 </head>
                 <body>
+                    <div class="bg-glow-1"></div>
+                    <div class="bg-glow-2"></div>
+                    <div class="bg-grid"></div>
+
                     <div class="container">
-                        <div class="checkmark">✓</div>
+                        <div class="icon-wrapper">
+                            <div class="icon-ring"></div>
+                            <div class="icon-circle">
+                                <svg fill="none" viewBox="0 0 24 24">
+                                    <path class="check-path" stroke="#10b981" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
+                        </div>
                         <h1>로그인 성공!</h1>
-                        <p>이 창을 닫고 Nova AI로 돌아가세요.</p>
+                        <p class="subtitle">이 창을 닫고 Nova AI로 돌아가세요.</p>
+                        <div class="countdown-badge">
+                            <div class="countdown-dot"></div>
+                            <span class="countdown-text"><span id="sec">3</span>초 후 자동으로 닫힙니다</span>
+                        </div>
                     </div>
-                    <script>setTimeout(() => window.close(), 2000);</script>
+
+                    <script>
+                        let t = 3;
+                        const el = document.getElementById('sec');
+                        const iv = setInterval(() => {
+                            t--;
+                            if (el) { el.textContent = t; el.classList.remove('tick'); void el.offsetWidth; el.classList.add('tick'); }
+                            if (t <= 0) { clearInterval(iv); window.close(); }
+                        }, 1000);
+                    </script>
                 </body>
                 </html>
                 """

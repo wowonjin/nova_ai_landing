@@ -171,7 +171,8 @@ function AuthCallbackContent({
                 if (email) redirectUrl.searchParams.set("email", email);
                 if (photoUrl)
                     redirectUrl.searchParams.set("photo_url", photoUrl);
-                if (tier ?? plan) redirectUrl.searchParams.set("tier", tier ?? plan);
+                const selectedTier = tier ?? plan;
+                if (selectedTier) redirectUrl.searchParams.set("tier", selectedTier);
                 if (plan) redirectUrl.searchParams.set("plan", plan);
 
                 window.location.href = redirectUrl.toString();
@@ -199,154 +200,297 @@ function AuthCallbackContent({
 
     return (
         <div
-            className="min-h-screen flex items-center justify-center p-4"
+            className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
             style={{
-                background: "#000000",
+                background: "#0a0a0f",
             }}
         >
-            <div className="max-w-lg w-full text-center">
+            {/* Ambient background glow */}
+            <div
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-20 blur-[120px] pointer-events-none"
+                style={{
+                    background: "radial-gradient(circle, #6366f1 0%, #8b5cf6 40%, transparent 70%)",
+                }}
+            />
+            <div
+                className="absolute top-1/4 right-1/4 w-[300px] h-[300px] rounded-full opacity-10 blur-[80px] pointer-events-none"
+                style={{
+                    background: "radial-gradient(circle, #06b6d4 0%, transparent 70%)",
+                }}
+            />
+
+            {/* Subtle grid pattern */}
+            <div
+                className="absolute inset-0 opacity-[0.03] pointer-events-none"
+                style={{
+                    backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                                      linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+                    backgroundSize: "60px 60px",
+                }}
+            />
+
+            <style jsx>{`
+                @keyframes checkDraw {
+                    0% { stroke-dashoffset: 24; opacity: 0; }
+                    40% { opacity: 1; }
+                    100% { stroke-dashoffset: 0; opacity: 1; }
+                }
+                @keyframes scaleIn {
+                    0% { transform: scale(0.8); opacity: 0; }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+                @keyframes fadeUp {
+                    0% { transform: translateY(12px); opacity: 0; }
+                    100% { transform: translateY(0); opacity: 1; }
+                }
+                @keyframes ringPulse {
+                    0% { transform: scale(1); opacity: 0.4; }
+                    100% { transform: scale(1.8); opacity: 0; }
+                }
+                @keyframes shimmer {
+                    0% { background-position: -200% center; }
+                    100% { background-position: 200% center; }
+                }
+                .check-draw {
+                    stroke-dasharray: 24;
+                    stroke-dashoffset: 24;
+                    animation: checkDraw 0.6s ease-out 0.3s forwards;
+                }
+                .scale-in {
+                    animation: scaleIn 0.4s ease-out forwards;
+                }
+                .fade-up-1 {
+                    opacity: 0;
+                    animation: fadeUp 0.5s ease-out 0.6s forwards;
+                }
+                .fade-up-2 {
+                    opacity: 0;
+                    animation: fadeUp 0.5s ease-out 0.8s forwards;
+                }
+                .fade-up-3 {
+                    opacity: 0;
+                    animation: fadeUp 0.5s ease-out 1.0s forwards;
+                }
+                .ring-pulse {
+                    animation: ringPulse 2s ease-out infinite;
+                }
+                .shimmer-text {
+                    background: linear-gradient(90deg, #e2e8f0 0%, #f8fafc 50%, #e2e8f0 100%);
+                    background-size: 200% auto;
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                    animation: shimmer 3s linear infinite;
+                }
+            `}</style>
+
+            <div className="max-w-lg w-full text-center relative z-10">
                 {!showInfo && userInfo ? (
                     // Desktop app session - show simple success message
                     <div className="space-y-8">
-                        <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white/10 backdrop-blur-sm">
-                            <svg
-                                className="w-12 h-12 text-white"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                        {/* Success icon with animated ring */}
+                        <div className="relative inline-flex items-center justify-center">
+                            <div className="absolute w-28 h-28 rounded-full border border-emerald-500/30 ring-pulse" />
+                            <div
+                                className="relative w-24 h-24 rounded-full flex items-center justify-center scale-in"
+                                style={{
+                                    background: "linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(99,102,241,0.2) 100%)",
+                                    border: "1px solid rgba(16,185,129,0.3)",
+                                    boxShadow: "0 0 40px rgba(16,185,129,0.15), inset 0 1px 0 rgba(255,255,255,0.05)",
+                                }}
                             >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                />
-                            </svg>
+                                <svg
+                                    className="w-10 h-10"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    style={{ filter: "drop-shadow(0 0 8px rgba(16,185,129,0.5))" }}
+                                >
+                                    <path
+                                        className="check-draw"
+                                        stroke="#10b981"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2.5}
+                                        d="M5 13l4 4L19 7"
+                                    />
+                                </svg>
+                            </div>
                         </div>
-                        <div className="space-y-4">
-                            <h1 className="text-5xl font-light text-white tracking-tight">
+
+                        <div className="space-y-3 fade-up-1">
+                            <h1 className="text-4xl font-semibold tracking-tight shimmer-text">
                                 Login Complete
                             </h1>
-                            <p className="text-xl text-gray-400 font-light">
-                                You can close this window
+                            <p className="text-base text-gray-400 font-light">
+                                You can close this window and return to Nova AI
                             </p>
                         </div>
-                        <div className="pt-4">
-                            <p className="text-sm text-gray-500 font-mono">
-                                Closing in {countdown}s
-                            </p>
+
+                        <div className="pt-2 fade-up-2">
+                            <div
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm"
+                                style={{
+                                    background: "rgba(255,255,255,0.04)",
+                                    border: "1px solid rgba(255,255,255,0.08)",
+                                }}
+                            >
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                <span className="text-gray-400 font-mono text-xs">
+                                    Closing in {countdown}s
+                                </span>
+                            </div>
                         </div>
                     </div>
                 ) : showInfo && userInfo ? (
-                    // Regular web session - show detailed info
-                    <>
-                        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                            <p className="text-green-800 font-semibold">
-                                ✅ Login successful! Window will close in{" "}
-                                <span className="text-blue-600 font-bold">
-                                    {countdown}
-                                </span>{" "}
-                                seconds...
-                            </p>
+                    // Regular web session - show detailed info (dark mode)
+                    <div className="space-y-6">
+                        {/* Success banner */}
+                        <div
+                            className="p-4 rounded-xl fade-up-1"
+                            style={{
+                                background: "linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(99,102,241,0.08) 100%)",
+                                border: "1px solid rgba(16,185,129,0.2)",
+                            }}
+                        >
+                            <div className="flex items-center justify-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                        <path
+                                            className="check-draw"
+                                            stroke="#10b981"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2.5}
+                                            d="M5 13l4 4L19 7"
+                                        />
+                                    </svg>
+                                </div>
+                                <p className="text-emerald-300 font-medium text-sm">
+                                    Login successful! Closing in{" "}
+                                    <span className="text-white font-bold tabular-nums">
+                                        {countdown}
+                                    </span>
+                                    s
+                                </p>
+                            </div>
                         </div>
 
-                        <div className="space-y-4 mb-8">
-                            <h2 className="text-xl font-semibold text-gray-900">
-                                Received User Info:
-                            </h2>
+                        {/* User info card */}
+                        <div
+                            className="rounded-2xl p-6 space-y-5 fade-up-2"
+                            style={{
+                                background: "rgba(255,255,255,0.03)",
+                                border: "1px solid rgba(255,255,255,0.07)",
+                                backdropFilter: "blur(20px)",
+                            }}
+                        >
+                            {/* Profile header */}
+                            <div className="flex items-center gap-4 pb-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                                {userInfo.photo_url ? (
+                                    <img
+                                        src={userInfo.photo_url}
+                                        alt="Profile"
+                                        className="w-14 h-14 rounded-full object-cover ring-2 ring-indigo-500/30"
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = "none";
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500/30 to-purple-500/30 flex items-center justify-center ring-2 ring-indigo-500/20">
+                                        <span className="text-xl text-white/80">
+                                            {userInfo.name?.[0]?.toUpperCase() || "?"}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="text-left">
+                                    <h2 className="text-lg font-semibold text-white">
+                                        {userInfo.name || "User"}
+                                    </h2>
+                                    <p className="text-sm text-gray-400">
+                                        {userInfo.email || "No email"}
+                                    </p>
+                                </div>
+                            </div>
 
-                            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                                <div className="flex items-start">
-                                    <span className="font-semibold text-gray-700 w-24">
-                                        UID:
+                            {/* Info rows */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        UID
                                     </span>
-                                    <span className="text-gray-900 font-mono text-sm break-all">
+                                    <span className="text-sm text-gray-300 font-mono truncate max-w-[240px]">
                                         {userInfo.uid || "N/A"}
                                     </span>
                                 </div>
-                                <div className="flex items-start">
-                                    <span className="font-semibold text-gray-700 w-24">
-                                        Name:
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Tier
                                     </span>
-                                    <span className="text-gray-900">
-                                        {userInfo.name || "N/A"}
-                                    </span>
-                                </div>
-                                <div className="flex items-start">
-                                    <span className="font-semibold text-gray-700 w-24">
-                                        Email:
-                                    </span>
-                                    <span className="text-gray-900">
-                                        {userInfo.email || "N/A"}
-                                    </span>
-                                </div>
-                                <div className="flex items-start">
-                                    <span className="font-semibold text-gray-700 w-24">
-                                        Photo URL:
-                                    </span>
-                                    <span className="text-gray-900 font-mono text-sm break-all">
-                                        {userInfo.photo_url || "N/A"}
-                                    </span>
-                                </div>
-                                <div className="flex items-start">
-                                    <span className="font-semibold text-gray-700 w-24">
-                                        Tier:
-                                    </span>
-                                    <span className="text-gray-900 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium w-fit">
+                                    <span
+                                        className="text-xs font-medium px-3 py-1 rounded-full"
+                                        style={{
+                                            background: "rgba(99,102,241,0.15)",
+                                            color: "#a5b4fc",
+                                            border: "1px solid rgba(99,102,241,0.25)",
+                                        }}
+                                    >
                                         {userInfo.tier || "N/A"}
                                     </span>
                                 </div>
-                                <div className="flex items-start">
-                                    <span className="font-semibold text-gray-700 w-24">
-                                        Plan:
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Plan
                                     </span>
-                                    <span className="text-gray-900 px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium w-fit">
+                                    <span
+                                        className="text-xs font-medium px-3 py-1 rounded-full"
+                                        style={{
+                                            background: "rgba(139,92,246,0.15)",
+                                            color: "#c4b5fd",
+                                            border: "1px solid rgba(139,92,246,0.25)",
+                                        }}
+                                    >
                                         {userInfo.plan || "N/A"}
                                     </span>
                                 </div>
                             </div>
-
-                            {userInfo.photo_url && (
-                                <div>
-                                    <h3 className="font-semibold text-gray-900 mb-2">
-                                        Profile Photo:
-                                    </h3>
-                                    <img
-                                        src={userInfo.photo_url}
-                                        alt="User profile"
-                                        className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
-                                        onError={(e) => {
-                                            (
-                                                e.target as HTMLImageElement
-                                            ).style.display = "none";
-                                        }}
-                                    />
-                                </div>
-                            )}
                         </div>
 
-                        <div className="text-center">
+                        {/* Close button */}
+                        <div className="fade-up-3">
                             <button
                                 onClick={() => tryClose()}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                className="px-8 py-2.5 rounded-xl text-sm font-medium text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                                style={{
+                                    background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                                    boxShadow: "0 4px 20px rgba(99,102,241,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
+                                }}
                             >
                                 Close Window
                             </button>
-                            <p className="text-sm text-gray-400 mt-3">
-                                Served by{" "}
-                                <strong>app/auth-callback/page.tsx</strong>
+                        </div>
+                    </div>
+                ) : (
+                    // Loading state
+                    <div className="space-y-6">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full"
+                            style={{
+                                background: "rgba(255,255,255,0.04)",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                            }}
+                        >
+                            <svg className="w-7 h-7 text-indigo-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                        </div>
+                        <div className="space-y-2">
+                            <h1 className="text-2xl font-semibold text-white">
+                                Authenticating
+                            </h1>
+                            <p className="text-gray-500 text-sm">
+                                Processing your login...
                             </p>
                         </div>
-                    </>
-                ) : (
-                    <div>
-                        <div className="text-4xl mb-4">🔐</div>
-                        <h1 className="text-2xl font-bold mb-4 text-gray-900">
-                            Login Callback
-                        </h1>
-                        <p className="text-gray-500">
-                            Processing authentication...
-                        </p>
                     </div>
                 )}
             </div>
