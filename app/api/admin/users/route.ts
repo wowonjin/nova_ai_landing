@@ -74,6 +74,11 @@ export async function GET(request: NextRequest) {
     }
 
     try {
+        const resolvedProjectId =
+            admin.app().options.projectId ||
+            process.env.FIREBASE_PROJECT_ID ||
+            process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+            "";
         const { searchParams } = new URL(request.url);
         const limit = parseInt(searchParams.get("limit") || "50");
         const offset = parseInt(searchParams.get("offset") || "0");
@@ -236,9 +241,16 @@ export async function GET(request: NextRequest) {
             total,
             limit,
             offset,
+            diagnostics: {
+                projectId: resolvedProjectId,
+                authUsersCount: authUsers.length,
+                firestoreUsersCount: usersSnapshot.size,
+            },
         });
     } catch (error) {
         console.error("Admin users error:", error);
+        const errorMessage =
+            error instanceof Error ? error.message : String(error);
         return NextResponse.json({
             users: [],
             total: 0,
@@ -246,6 +258,7 @@ export async function GET(request: NextRequest) {
             offset: 0,
             warning:
                 "firebase_admin_not_configured: check FIREBASE_ADMIN_CREDENTIALS and project settings",
+            error: errorMessage,
         });
     }
 }

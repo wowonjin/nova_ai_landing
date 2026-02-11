@@ -26,6 +26,15 @@ export default function getFirebaseAdmin() {
         if (serviceAccountJson) {
             // Prefer an explicit JSON string in env (useful on platforms that allow secret JSON)
             const parsed = JSON.parse(serviceAccountJson);
+            if (
+                configuredProjectId &&
+                parsed.project_id &&
+                configuredProjectId !== parsed.project_id
+            ) {
+                throw new Error(
+                    `Firebase project mismatch: FIREBASE_PROJECT_ID/NEXT_PUBLIC_FIREBASE_PROJECT_ID is "${configuredProjectId}" but service account project_id is "${parsed.project_id}".`,
+                );
+            }
             admin.initializeApp({
                 credential: admin.credential.cert(parsed),
                 projectId: configuredProjectId || parsed.project_id,
@@ -36,6 +45,15 @@ export default function getFirebaseAdmin() {
                 "utf8"
             );
             const parsed = JSON.parse(json);
+            if (
+                configuredProjectId &&
+                parsed.project_id &&
+                configuredProjectId !== parsed.project_id
+            ) {
+                throw new Error(
+                    `Firebase project mismatch: FIREBASE_PROJECT_ID/NEXT_PUBLIC_FIREBASE_PROJECT_ID is "${configuredProjectId}" but service account project_id is "${parsed.project_id}".`,
+                );
+            }
             admin.initializeApp({
                 credential: admin.credential.cert(parsed),
                 projectId: configuredProjectId || parsed.project_id,
