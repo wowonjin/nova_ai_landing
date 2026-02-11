@@ -1352,7 +1352,7 @@ nextjs-portal {
     padding: 7rem var(--padding-x);
     background-color: #000;
     position: relative;
-    scroll-margin-top: 88px;
+    scroll-margin-top: 96px;
 }
 
 @media (max-width: 1024px) {
