@@ -102,7 +102,8 @@ export async function GET(request: NextRequest) {
 
             mergedUsers.set(doc.id, {
                 uid: doc.id,
-                email: data.email || authUser?.email || "",
+                // Firebase Auth 이메일을 최우선으로 사용해 admin 화면과 실제 인증 정보 일치 보장
+                email: authUser?.email || data.email || "",
                 displayName: data.displayName || authUser?.displayName || "",
                 photoURL:
                     data.avatar || data.photoURL || authUser?.photoURL || "",
