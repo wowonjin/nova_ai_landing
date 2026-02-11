@@ -411,6 +411,9 @@ _MI_DELETE = "\ue872"      # delete
 _MI_RETYPE = "\ue042"      # replay
 _MI_CODE = "\ue86f"        # code
 _MI_HOME = "\ue88a"        # home (language/web)
+_MI_DOWNLOAD = "\ue2c4"    # file_download
+_MI_CLOSE = "\ue5cd"       # close
+_MI_CHAT = "\ue0b7"        # chat
 
 
 def _material_icon(
@@ -864,12 +867,31 @@ class UsageDialog(_FramelessCardDialog):
 
     def __init__(self, parent=None, *, tier: str = "Free",
                  usage: int = 0, limit: int = 5):
-        super().__init__(parent, 380, 320)
+        super().__init__(parent, 380, 340)
         self.setWindowTitle("사용 내역")
         card = self._make_card()
         lay = QVBoxLayout(card)
-        lay.setContentsMargins(32, 28, 32, 24)
+        lay.setContentsMargins(32, 16, 32, 24)
         lay.setSpacing(0)
+
+        # 닫기 버튼 (우상단)
+        close_row = QHBoxLayout()
+        close_row.setContentsMargins(0, 0, 0, 0)
+        close_row.addStretch()
+        close_btn = QPushButton()
+        close_btn.setFixedSize(28, 28)
+        close_btn.setIcon(_material_icon(_MI_CLOSE, 18, QColor("#9ca3af")))
+        close_btn.setIconSize(QSize(18, 18))
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet(
+            "QPushButton { border: none; background: transparent;"
+            "  border-radius: 14px; }"
+            "QPushButton:hover { background-color: #e5e7eb; }"
+        )
+        close_btn.clicked.connect(self.accept)
+        close_row.addWidget(close_btn)
+        lay.addLayout(close_row)
+        lay.addSpacing(2)
 
         _tier_colors = {
             "Free": "#6366f1", "free": "#6366f1",
@@ -941,10 +963,9 @@ class UsageDialog(_FramelessCardDialog):
             f"font-size: 12px; color: {'#ef4444' if remaining <= 0 else '#9ca3af'}; background: transparent;"
         )
         lay.addWidget(rem)
-        lay.addSpacing(20)
-
-        # button
+        # 한도 도달 시 업그레이드 버튼 표시
         if remaining <= 0:
+            lay.addSpacing(20)
             btn = QPushButton("플랜 업그레이드")
             btn.setStyleSheet(
                 "QPushButton { background-color: #f59e0b; color: #ffffff; border: none;"
@@ -952,24 +973,131 @@ class UsageDialog(_FramelessCardDialog):
                 "QPushButton:hover { background-color: #d97706; }"
             )
             btn.clicked.connect(self._open_pricing)
-        else:
-            btn = QPushButton("확인")
-            btn.setStyleSheet(
-                f"QPushButton {{ background-color: {accent}; color: #ffffff; border: none;"
-                "  border-radius: 10px; font-size: 13px; font-weight: 600; padding: 0 32px; }"
-                f"QPushButton:hover {{ background-color: {accent}dd; }}"
-            )
-            btn.clicked.connect(self.accept)
-        btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setFixedHeight(40)
-        br = QHBoxLayout()
-        br.addStretch(); br.addWidget(btn); br.addStretch()
-        lay.addLayout(br)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedHeight(40)
+            br = QHBoxLayout()
+            br.addStretch(); br.addWidget(btn); br.addStretch()
+            lay.addLayout(br)
 
     def _open_pricing(self):
         import webbrowser
         webbrowser.open("https://www.nova-ai.work/profile?tab=subscription")
         self.accept()
+
+
+class DownloadFormDialog(_FramelessCardDialog):
+    """양식 다운로드 팝업 다이얼로그."""
+
+    _FORMS = [
+        ("수능 국어 양식 다운로드",
+         "https://storage.googleapis.com/physics2/%EC%96%91%EC%8B%9D/%EC%88%98%EB%8A%A5%20%EA%B5%AD%EC%96%B4%20%EC%96%91%EC%8B%9D%20%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C.hwp"),
+        ("수능 영어 양식 다운로드",
+         "https://storage.googleapis.com/physics2/%EC%96%91%EC%8B%9D/%EC%88%98%EB%8A%A5%20%EC%98%81%EC%96%B4%20%EC%96%91%EC%8B%9D%20%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C.hwp"),
+        ("수능 수학 양식 다운로드",
+         "https://storage.googleapis.com/physics2/%EC%96%91%EC%8B%9D/%EC%88%98%EB%8A%A5%20%EC%88%98%ED%95%99%20%EC%96%91%EC%8B%9D%20%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C.hwp"),
+        ("수능 과탐 양식 다운로드",
+         "https://storage.googleapis.com/physics2/%EC%96%91%EC%8B%9D/%EC%88%98%EB%8A%A5%20%EA%B3%BC%ED%83%90%20%EC%96%91%EC%8B%9D%20%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C.hwp"),
+        ("수능 사탐 양식 다운로드",
+         "https://storage.googleapis.com/physics2/%EC%96%91%EC%8B%9D/%EC%88%98%EB%8A%A5%20%EC%82%AC%ED%9A%8C%20%EC%96%91%EC%8B%9D%20%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C.hwp"),
+    ]
+    _EXAM_BANK_URL = "https://novabook-six.vercel.app/exam-papers"
+
+    def __init__(self, parent=None):
+        super().__init__(parent, 380, 440)
+        self.setWindowTitle("양식 다운로드")
+        card = self._make_card()
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(32, 16, 32, 24)
+        lay.setSpacing(0)
+
+        # 닫기 버튼 (우상단)
+        close_row = QHBoxLayout()
+        close_row.setContentsMargins(0, 0, 0, 0)
+        close_row.addStretch()
+        close_btn = QPushButton()
+        close_btn.setFixedSize(28, 28)
+        close_btn.setIcon(_material_icon(_MI_CLOSE, 18, QColor("#9ca3af")))
+        close_btn.setIconSize(QSize(18, 18))
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet(
+            "QPushButton { border: none; background: transparent;"
+            "  border-radius: 14px; }"
+            "QPushButton:hover { background-color: #e5e7eb; }"
+        )
+        close_btn.clicked.connect(self.accept)
+        close_row.addWidget(close_btn)
+        lay.addLayout(close_row)
+        lay.addSpacing(2)
+
+        icon_label = QLabel(_MI_DOWNLOAD)
+        icon_label.setFont(QFont("Material Icons", 32))
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setStyleSheet("color: #6366f1; background: transparent;")
+        icon_label.setFixedHeight(44)
+        lay.addWidget(icon_label)
+        lay.addSpacing(10)
+
+        title = QLabel("양식 다운로드")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet(
+            "font-size: 17px; font-weight: 700; color: #1a1a2e; background: transparent;"
+        )
+        lay.addWidget(title)
+        lay.addSpacing(6)
+
+        subtitle = QLabel("수능 과목별 HWP 양식을 다운로드하세요")
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle.setStyleSheet(
+            "font-size: 11px; color: #9ca3af; background: transparent;"
+        )
+        lay.addWidget(subtitle)
+        lay.addSpacing(18)
+
+        for label_text, url in self._FORMS:
+            btn = QPushButton(f"  {_MI_DOWNLOAD}  {label_text}")
+            btn.setFont(self._mixed_font())
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedHeight(36)
+            btn.setStyleSheet(
+                "QPushButton { background-color: #f3f4f6; color: #1a1a2e; border: none;"
+                "  border-radius: 8px; font-size: 12px; font-weight: 500;"
+                "  text-align: left; padding: 0 14px; }"
+                "QPushButton:hover { background-color: #d1d5db; color: #111827; }"
+            )
+            btn.clicked.connect(lambda checked, u=url: self._open_url(u))
+            lay.addWidget(btn)
+            lay.addSpacing(6)
+
+        lay.addSpacing(4)
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet("background-color: #f3f4f6; border: none;")
+        lay.addWidget(sep)
+        lay.addSpacing(10)
+
+        bank_btn = QPushButton("  기출뱅크 이동하기")
+        bank_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        bank_btn.setFixedHeight(40)
+        bank_btn.setStyleSheet(
+            "QPushButton { background-color: #6366f1; color: #ffffff; border: none;"
+            "  border-radius: 10px; font-size: 13px; font-weight: 600; padding: 0 32px; }"
+            "QPushButton:hover { background-color: #4338ca; }"
+        )
+        bank_btn.clicked.connect(lambda: self._open_url(self._EXAM_BANK_URL))
+        br = QHBoxLayout()
+        br.addStretch(); br.addWidget(bank_btn); br.addStretch()
+        lay.addLayout(br)
+
+    @staticmethod
+    def _mixed_font() -> QFont:
+        f = QFont()
+        f.setFamilies(["Material Icons", "Pretendard", "sans-serif"])
+        return f
+
+    @staticmethod
+    def _open_url(url: str) -> None:
+        import webbrowser
+        webbrowser.open(url)
 
 
 class NeedLoginDialog(_FramelessCardDialog):
@@ -1106,12 +1234,14 @@ class SidebarWidget(QFrame):
             "usage": _MI_BAR_CHART,
             "upgrade": _MI_STAR,
             "homepage": _MI_HOME,
+            "inquiry": _MI_CHAT,
         }
         for mid, mlabel in [
             ("profile", "회원 정보"),
             ("usage", "사용 내역"),
             ("upgrade", "플랜 업그레이드"),
             ("homepage", "홈페이지"),
+            ("inquiry", "오류/문의사항"),
         ]:
             btn = QPushButton(mlabel)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1179,8 +1309,8 @@ class SidebarWidget(QFrame):
     ) -> None:
         _tier_map = {
             "Free": "무료", "free": "무료",
-            "Standard": "\u25c7 PLUS", "standard": "\u25c7 PLUS",
-            "Plus": "\u25c7 PLUS", "plus": "\u25c7 PLUS",
+            "Standard": "PLUS", "standard": "PLUS",
+            "Plus": "PLUS", "plus": "PLUS",
             "Pro": "ULTRA", "pro": "ULTRA", "ultra": "ULTRA",
         }
         # tier → accent color
@@ -1461,12 +1591,25 @@ class NovaAILiteWindow(QWidget):
         self._menu_btn.clicked.connect(self._toggle_sidebar)
         _h_lay.addWidget(self._menu_btn)
 
+        # 양식 다운로드 버튼 (메뉴 아이콘 바로 오른쪽)
+        self._download_form_btn = QPushButton("양식 다운로드")
+        self._download_form_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._download_form_btn.setStyleSheet(
+            "QPushButton { border: none; background: transparent;"
+            "  font-size: 12px; font-weight: 600; color: #1a1a2e;"
+            "  border-radius: 8px; padding: 6px 12px; }"
+            "QPushButton:hover { background: transparent; color: #6366f1; }"
+        )
+        self._download_form_btn.clicked.connect(self._on_download_form_clicked)
+        _h_lay.addWidget(self._download_form_btn)
+
         _h_lay.addStretch(1)
 
         # 오른쪽: 아바타 아이콘 + 이름/플랜 두 줄
         self._header_user_area = QWidget()
         self._header_user_area.setCursor(Qt.CursorShape.PointingHandCursor)
         self._header_user_area.setStyleSheet("background: transparent;")
+        self._header_user_area.installEventFilter(self)
         _hu_lay = QHBoxLayout(self._header_user_area)
         _hu_lay.setContentsMargins(6, 4, 10, 4)
         _hu_lay.setSpacing(8)
@@ -1492,8 +1635,7 @@ class NovaAILiteWindow(QWidget):
         self._header_user_btn = QPushButton(self._header_user_area)
         self._header_user_btn.setStyleSheet(
             "QPushButton { border: none; background: transparent; }"
-            "QPushButton:hover { background-color: rgba(0,0,0,0.03);"
-            "  border-radius: 10px; }"
+            "QPushButton:hover { background: transparent; }"
         )
         self._header_user_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._header_user_btn.clicked.connect(self._on_header_user_clicked)
@@ -1520,7 +1662,7 @@ class NovaAILiteWindow(QWidget):
         self._profile_usage_last_refresh = 0.0
 
         self._timer = QTimer(self)
-        self._timer.setInterval(1000)
+        self._timer.setInterval(500)
         self._timer.timeout.connect(self._schedule_filename_update)
         self._timer.start()
         self.update_filename()
@@ -1579,7 +1721,7 @@ class NovaAILiteWindow(QWidget):
         """사용자 로그인 상태 및 사용량 정보를 사이드바 + 헤더에 업데이트"""
         _tier_map = {
             "Free": "무료", "free": "무료",
-            "Standard": "Standard", "Plus": "\u25c7 PLUS", "Pro": "Pro",
+            "Standard": "Standard", "Plus": "PLUS", "Pro": "Pro",
         }
         if self.profile_uid:
             tier = self.profile_plan or "Free"
@@ -1667,6 +1809,12 @@ class NovaAILiteWindow(QWidget):
             self._profile_usage_last_refresh = 0.0
             self._update_user_status(refresh=False)
 
+    # ── 양식 다운로드 팝업 ─────────────────────────────
+    def _on_download_form_clicked(self) -> None:
+        """헤더 양식 다운로드 버튼 클릭"""
+        dlg = DownloadFormDialog(self)
+        dlg.exec()
+
     # ── Header user area click ────────────────────────
     def _on_header_user_clicked(self) -> None:
         """헤더 사용자 영역 클릭 – 로그인 상태에 따라 분기"""
@@ -1726,6 +1874,9 @@ class NovaAILiteWindow(QWidget):
         elif menu_id == "homepage":
             import webbrowser
             webbrowser.open("https://nova-ai.work")
+        elif menu_id == "inquiry":
+            import webbrowser
+            webbrowser.open("https://open.kakao.com/o/sVWlO2fi")
 
     def _show_profile_dialog(self) -> None:
         if not self.profile_uid:
@@ -2157,6 +2308,15 @@ class NovaAILiteWindow(QWidget):
 
     def eventFilter(self, obj, event):  # type: ignore[override]
         try:
+            if obj is getattr(self, "_header_user_area", None):
+                if event.type() == QEvent.Type.Enter:
+                    self._header_name.setStyleSheet(
+                        "font-size: 12px; font-weight: 600; color: #6366f1; background: transparent;"
+                    )
+                elif event.type() == QEvent.Type.Leave:
+                    self._header_name.setStyleSheet(
+                        "font-size: 12px; font-weight: 600; color: #1a1a2e; background: transparent;"
+                    )
             if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
                 self._cancel_typing()
                 return True

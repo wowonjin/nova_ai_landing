@@ -30,7 +30,12 @@ try:
 except Exception:
     GOOGLE_AUTH_AVAILABLE = False
 
-from backend.oauth_desktop import get_stored_user, save_user, _get_user_data_dir
+from backend.oauth_desktop import (
+    WEB_BASE_URL,
+    get_stored_user,
+    save_user,
+    _get_user_data_dir,
+)
 
 
 def _load_env_vars() -> None:
@@ -174,7 +179,9 @@ def _resolve_usage_api_base_url() -> str:
         or os.getenv("NOVA_WEB_BASE_URL")
         or os.getenv("NOVA_APP_BASE_URL")
         or os.getenv("NEXT_PUBLIC_APP_URL")
-        or "https://nova-ai.work"
+        # Keep usage API base aligned with desktop login target.
+        or WEB_BASE_URL
+        or "https://www.nova-ai.work"
     )
     return str(base).rstrip("/")
 
