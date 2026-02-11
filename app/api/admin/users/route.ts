@@ -88,9 +88,11 @@ export async function GET(request: NextRequest) {
         ]);
 
         const mergedUsers = new Map<string, AdminUserListItem>();
+        const authUsersByUid = new Map(authUsers.map((authUser) => [authUser.uid, authUser]));
 
         usersSnapshot.forEach((doc) => {
             const data = doc.data();
+            const authUser = authUsersByUid.get(doc.id);
             const subscription = data.subscription || {};
             const plan = (subscription.plan || data.plan || "free") as PlanTier;
             const status = String(subscription.status || "none");
@@ -100,10 +102,13 @@ export async function GET(request: NextRequest) {
 
             mergedUsers.set(doc.id, {
                 uid: doc.id,
-                email: data.email || "",
-                displayName: data.displayName || "",
-                photoURL: data.avatar || data.photoURL || "",
-                createdAt: normalizeCreatedAt(data.createdAt),
+                email: data.email || authUser?.email || "",
+                displayName: data.displayName || authUser?.displayName || "",
+                photoURL:
+                    data.avatar || data.photoURL || authUser?.photoURL || "",
+                createdAt: normalizeCreatedAt(
+                    data.createdAt || authUser?.createdAt,
+                ),
                 cumulativeAmount: 0,
                 subscription: {
                     plan: plan,
@@ -125,7 +130,19 @@ export async function GET(request: NextRequest) {
 
         // Firestore 문서가 없는 Auth 사용자도 관리자 목록에 노출
         authUsers.forEach((authUser) => {
-            if (mergedUsers.has(authUser.uid)) return;
+            const existing = mergedUsers.get(authUser.uid);
+            if (existing) {
+                // Firestore 문서가 있어도 이메일/프로필이 비어있으면 Auth 값으로 보정
+                if (!existing.email) existing.email = authUser.email || "";
+                if (!existing.displayName) {
+                    existing.displayName = authUser.displayName || "";
+                }
+                if (!existing.photoURL) existing.photoURL = authUser.photoURL || "";
+                if (!existing.createdAt) {
+                    existing.createdAt = authUser.createdAt || "";
+                }
+                return;
+            }
 
             const usageLimit = getTierLimit("free");
             mergedUsers.set(authUser.uid, {

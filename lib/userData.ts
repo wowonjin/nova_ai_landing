@@ -40,12 +40,14 @@ export function inferPlanFromAmount(
     billingCycle?: "monthly" | "yearly" | "test" | string | null,
 ): UserPlan {
     if (billingCycle === "test") return "test";
-    // Keep compatibility with discounted yearly prices used in pricing UI.
-    if (amount === 60 || amount === 840) return "plus";
-    if (amount === 59400 || amount === 831600) return "pro";
-    if (amount === 100) return "plus";
-    if (amount >= 99000) return "pro";
-    if (amount >= 100) return "plus";
+    // Keep compatibility with legacy/test prices and current production prices.
+    if (amount === 100 || amount === 60 || amount === 720 || amount === 840) return "plus";
+    if (amount === 59400 || amount === 712800 || amount === 831600) return "pro";
+    if (amount === 29900 || amount === 251160) return "plus";
+    if (amount === 99000) return "pro";
+    if (amount > 29900 && amount < 99000) return "plus";
+    if (amount > 99000) return "pro";
+    if (amount > 0) return "plus";
     return "free";
 }
 

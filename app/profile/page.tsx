@@ -139,7 +139,7 @@ const plansData: PlanData[] = [
         name: "Plus 요금제",
         description: "더 많은 기능과\n우선 지원을 받으세요",
         monthlyPrice: 29900,
-        yearlyPrice: 15900,
+        yearlyPrice: 20930,
         icon: <ZapIcon />,
         popular: true,
         features: [
@@ -158,7 +158,7 @@ const plansData: PlanData[] = [
         name: "Ultra 요금제",
         description: "모든 프리미엄 기능을 위한\n가장 강력한 플랜",
         monthlyPrice: 99000,
-        yearlyPrice: 39900,
+        yearlyPrice: 69300,
         icon: <CrownIcon />,
         features: [
             { text: "월 2000+200회 AI 생성", included: true },

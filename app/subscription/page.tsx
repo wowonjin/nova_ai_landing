@@ -84,8 +84,8 @@ export default function SubscriptionDashboard() {
         try {
             // 프로필 페이지의 구독 로직을 재사용 (단건 결제)
             const planPrices = {
-                plus: { monthly: 29900, yearly: 159000 },
-                pro: { monthly: 99000, yearly: 399000 },
+                plus: { monthly: 29900, yearly: 251160 },
+                pro: { monthly: 99000, yearly: 831600 },
             };
 
             const amount = planPrices[plan][cycle];
@@ -345,7 +345,7 @@ export default function SubscriptionDashboard() {
                                 >
                                     {actionLoading === "subscribe_plus_yearly"
                                         ? "처리 중..."
-                                        : "연간 구독 (99,000원)"}
+                                        : "연간 구독 (251,160원)"}
                                 </button>
                             </div>
 
@@ -380,7 +380,7 @@ export default function SubscriptionDashboard() {
                                 >
                                     {actionLoading === "subscribe_pro_yearly"
                                         ? "처리 중..."
-                                        : "연간 구독 (299,000원)"}
+                                        : "연간 구독 (831,600원)"}
                                 </button>
                             </div>
                         </div>

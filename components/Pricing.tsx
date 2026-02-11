@@ -59,8 +59,8 @@ const plans: PricingPlan[] = [
         name: "Plus 요금제",
         subDescription: "더 많은 기능과 우선 지원을 받으세요.",
         prices: {
-            monthly: "100",
-            yearly: "60",
+            monthly: "29,900",
+            yearly: "20,930",
         },
         features: [
             "월 300회+30회 AI 생성",
@@ -79,7 +79,7 @@ const plans: PricingPlan[] = [
         subDescription: "멀티 로그인이 가능합니다",
         prices: {
             monthly: "99,000",
-            yearly: "59,400",
+            yearly: "69,300",
         },
         features: [
             "월 2000+200회 AI 생성",
@@ -105,17 +105,20 @@ export default function Pricing() {
         Record<BillingCycle, { amount: number; orderName: string }>
     > = {
         plus: {
-            monthly: { amount: 100, orderName: "Nova AI Plus 요금제 (월간 결제)" },
+            monthly: {
+                amount: 29900,
+                orderName: "Nova AI Plus 요금제 (월간 결제)",
+            },
             yearly: {
-                amount: 720,
-                orderName: "Nova AI Plus 요금제 (연간 결제, 월 40% 할인 적용)",
+                amount: 251160,
+                orderName: "Nova AI Plus 요금제 (연간 결제, 월 30% 할인 적용)",
             },
         },
         pro: {
             monthly: { amount: 99000, orderName: "Nova AI Ultra 요금제 (월간 결제)" },
             yearly: {
-                amount: 712800,
-                orderName: "Nova AI Ultra 요금제 (연간 결제, 월 40% 할인 적용)",
+                amount: 831600,
+                orderName: "Nova AI Ultra 요금제 (연간 결제, 월 30% 할인 적용)",
             },
         },
     };
@@ -221,7 +224,7 @@ export default function Pricing() {
                         </button>
                         <div className="pricing-billing-toggle__annual-wrap">
                             <span className="pricing-billing-toggle__discount-badge">
-                                40% 할인
+                                30% 할인
                             </span>
                             <button
                                 type="button"

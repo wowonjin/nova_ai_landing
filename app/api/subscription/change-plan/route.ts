@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
         const planAmounts: Record<string, { monthly: number; yearly: number }> =
             {
                 free: { monthly: 0, yearly: 0 },
-                plus: { monthly: 29900, yearly: 159000 },
-                pro: { monthly: 99000, yearly: 399000 },
+                plus: { monthly: 29900, yearly: 251160 },
+                pro: { monthly: 99000, yearly: 831600 },
             };
         const newAmount =
             planAmounts[plan]?.[cycle as "monthly" | "yearly"] || 0;
