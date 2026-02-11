@@ -11,14 +11,14 @@ import threading
 import webbrowser
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlencode
 from typing import Optional, Dict, Any
 
 # Login page URL
 # Override with NOVA_WEB_BASE_URL when needed (e.g. staging/preview).
 WEB_BASE_URL = os.getenv(
     "NOVA_WEB_BASE_URL",
-    "https://formulite-landing-main.vercel.app",
+    "https://www.nova-ai.work",
 ).rstrip("/")
 LOGIN_URL = f"{WEB_BASE_URL}/login"
 CALLBACK_PORT = 8765
@@ -358,7 +358,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                             </div>
                         </div>
                         <h1>로그인 성공!</h1>
-                        <p class="subtitle">이 창을 닫고 Nova AI로 돌아가세요.</p>
+                        <p class="subtitle">로그인 완료 후 Nova AI 메인페이지로 이동합니다.</p>
                         <div class="countdown-badge">
                             <div class="countdown-dot"></div>
                             <span class="countdown-text"><span id="sec">3</span>초 후 자동으로 닫힙니다</span>
@@ -371,7 +371,10 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                         const iv = setInterval(() => {
                             t--;
                             if (el) { el.textContent = t; el.classList.remove('tick'); void el.offsetWidth; el.classList.add('tick'); }
-                            if (t <= 0) { clearInterval(iv); window.close(); }
+                            if (t <= 0) {
+                                clearInterval(iv);
+                                window.location.href = 'https://www.nova-ai.work/';
+                            }
                         }, 1000);
                     </script>
                 </body>
@@ -407,9 +410,18 @@ def start_oauth_flow(timeout: int = 300) -> Optional[Dict[str, Any]]:
     server = HTTPServer(("127.0.0.1", CALLBACK_PORT), OAuthCallbackHandler)
     server.timeout = timeout
     
-    # Build login URL with redirect
+    # Build login URL with redirect.
+    # force_account_switch=1 asks the web login page to sign out any
+    # existing browser session first so users can choose a different account.
     redirect_uri = f"http://localhost:{CALLBACK_PORT}{CALLBACK_PATH}"
-    login_url = f"{LOGIN_URL}?redirect_uri={redirect_uri}"
+    login_params = urlencode(
+        {
+            "redirect_uri": redirect_uri,
+            "force_account_switch": "1",
+            "source": "desktop",
+        }
+    )
+    login_url = f"{LOGIN_URL}?{login_params}"
     
     # Open browser
     try:

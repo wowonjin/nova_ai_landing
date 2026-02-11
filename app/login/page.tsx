@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Sparkles, Lock, Mail, ArrowLeft } from "lucide-react";
@@ -28,6 +28,9 @@ const Login = () => {
 function LoginContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const forceAccountSwitch =
+        searchParams?.get("force_account_switch") === "1";
+    const hasForcedLogoutRef = useRef(false);
 
     const {
         loginWithEmail,
@@ -50,6 +53,23 @@ function LoginContent() {
     const [signupMode, setSignupMode] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    useEffect(() => {
+        // Desktop login flow can request explicit account switching.
+        // In that mode, sign out any existing web session first.
+        if (!forceAccountSwitch || loading || !isAuthenticated) return;
+        if (hasForcedLogoutRef.current) return;
+
+        hasForcedLogoutRef.current = true;
+        (async () => {
+            try {
+                await logout();
+            } catch (err) {
+                console.error("Forced logout for account switch failed:", err);
+                hasForcedLogoutRef.current = false;
+            }
+        })();
+    }, [forceAccountSwitch, loading, isAuthenticated, logout]);
 
     // Helper function to fetch canonical user plan from Firestore
     const getUserPlan = async (uid: string): Promise<string> => {
@@ -161,6 +181,9 @@ function LoginContent() {
 
     useEffect(() => {
         if (!loading && isAuthenticated) {
+            if (forceAccountSwitch) {
+                return;
+            }
             // If user is already logged in, handle redirect_uri or session
             const redirectUri = searchParams?.get("redirect_uri");
             const sessionId = searchParams?.get("session");
@@ -178,7 +201,7 @@ function LoginContent() {
             }
             window.location.href = "/";
         }
-    }, [isAuthenticated, loading, searchParams]);
+    }, [forceAccountSwitch, isAuthenticated, loading, searchParams]);
 
     const handleChange =
         (field: keyof typeof form) =>

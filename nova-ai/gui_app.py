@@ -8,6 +8,7 @@ import threading
 import math
 import tempfile
 import time
+import uuid
 from pathlib import Path
 
 # Allow running this file directly (python gui_app.py) by ensuring the
@@ -57,6 +58,8 @@ from backend.firebase_profile import (
     check_usage_limit,
     get_plan_limit,
     force_refresh_usage,
+    register_desktop_device_session,
+    is_desktop_session_active,
     PLAN_LIMITS,
 )
 
@@ -115,6 +118,30 @@ class ProfileRefreshWorker(QThread):
         except Exception:
             usage = 0
         self.finished.emit(profile or {}, usage)
+
+
+class SessionGuardWorker(QThread):
+    finished = Signal(bool)
+
+    def __init__(self, uid: str, desktop_session_id: str, tier: str, email: str) -> None:
+        super().__init__()
+        self._uid = uid
+        self._desktop_session_id = desktop_session_id
+        self._tier = tier
+        self._email = email
+
+    def run(self) -> None:  # type: ignore[override]
+        try:
+            active = is_desktop_session_active(
+                self._uid,
+                self._desktop_session_id,
+                tier=self._tier,
+                email=self._email,
+            )
+        except Exception:
+            # Network/API issues should not force local logout.
+            active = True
+        self.finished.emit(bool(active))
 
 
 class AIWorker(QThread):
@@ -1658,13 +1685,20 @@ class NovaAILiteWindow(QWidget):
 
         self._filename_worker: FilenameWorker | None = None
         self._profile_worker: ProfileRefreshWorker | None = None
+        self._session_guard_worker: SessionGuardWorker | None = None
         self._profile_usage = 0
         self._profile_usage_last_refresh = 0.0
+        self._desktop_session_id = uuid.uuid4().hex
+        self._remote_logout_in_progress = False
 
         self._timer = QTimer(self)
         self._timer.setInterval(500)
         self._timer.timeout.connect(self._schedule_filename_update)
         self._timer.start()
+        self._session_guard_timer = QTimer(self)
+        self._session_guard_timer.setInterval(4000)
+        self._session_guard_timer.timeout.connect(self._schedule_session_guard_check)
+        self._session_guard_timer.start()
         self.update_filename()
         self._auto_type_after_ai = False
         self._current_code_index = -1
@@ -1692,6 +1726,7 @@ class NovaAILiteWindow(QWidget):
 
         # 초기 사용자 상태 업데이트 (로컬 캐시에서)
         self._load_stored_user()
+        self._register_desktop_session_if_needed()
         self._update_user_status()
         
         # Firebase에서 최신 프로필 동기화 (백그라운드)
@@ -1710,6 +1745,64 @@ class NovaAILiteWindow(QWidget):
             self.profile_display_name = "사용자"
             self.profile_plan = "Free"
             self.profile_avatar_url = None
+
+    def _register_desktop_session_if_needed(self) -> None:
+        """Single-device 요금제(Free/Plus/Test)에서 현재 PC 세션 등록."""
+        if not self.profile_uid:
+            return
+        user = get_stored_user() or {}
+        tier = str(user.get("plan") or user.get("tier") or self.profile_plan or "free")
+        email = str(user.get("email") or "")
+        register_desktop_device_session(
+            str(self.profile_uid),
+            self._desktop_session_id,
+            tier=tier,
+            email=email,
+        )
+
+    def _schedule_session_guard_check(self) -> None:
+        if not self.profile_uid:
+            return
+        if self._remote_logout_in_progress:
+            return
+        if self._session_guard_worker and self._session_guard_worker.isRunning():
+            return
+
+        user = get_stored_user() or {}
+        tier = str(user.get("plan") or user.get("tier") or self.profile_plan or "free")
+        email = str(user.get("email") or "")
+        self._session_guard_worker = SessionGuardWorker(
+            str(self.profile_uid),
+            self._desktop_session_id,
+            tier,
+            email,
+        )
+        self._session_guard_worker.finished.connect(self._on_session_guard_finished)
+        self._session_guard_worker.start()
+
+    def _on_session_guard_finished(self, is_active: bool) -> None:
+        if is_active or self._remote_logout_in_progress:
+            return
+        self._remote_logout_in_progress = True
+        self._close_sidebar()
+        self._apply_local_logout_state()
+        QMessageBox.information(
+            self,
+            "로그아웃됨",
+            "다른 컴퓨터에서 로그인되어 현재 기기에서 자동 로그아웃되었습니다.\n"
+            "Free/Plus 요금제는 동시 접속이 1대만 허용됩니다.",
+        )
+        self._remote_logout_in_progress = False
+
+    def _apply_local_logout_state(self) -> None:
+        logout_user()
+        self.profile_uid = None
+        self.profile_display_name = "사용자"
+        self.profile_plan = "Free"
+        self.profile_avatar_url = None
+        self._profile_usage = 0
+        self._profile_usage_last_refresh = 0.0
+        self._update_user_status(refresh=False)
 
     def _refresh_profile_from_firebase(self) -> None:
         """Firebase에서 최신 프로필과 사용량 동기화"""
@@ -1786,6 +1879,7 @@ class NovaAILiteWindow(QWidget):
         
         if success:
             self._load_stored_user()
+            self._register_desktop_session_if_needed()
             self._update_user_status()
             dlg = LoginResultDialog(self, success=True, user_name=self.profile_display_name)
             dlg.exec()
@@ -1800,14 +1894,7 @@ class NovaAILiteWindow(QWidget):
         self._close_sidebar()
         dlg = LogoutDialog(self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
-            logout_user()
-            self.profile_uid = None
-            self.profile_display_name = "사용자"
-            self.profile_plan = "Free"
-            self.profile_avatar_url = None
-            self._profile_usage = 0
-            self._profile_usage_last_refresh = 0.0
-            self._update_user_status(refresh=False)
+            self._apply_local_logout_state()
 
     # ── 양식 다운로드 팝업 ─────────────────────────────
     def _on_download_form_clicked(self) -> None:
@@ -1989,6 +2076,7 @@ class NovaAILiteWindow(QWidget):
             self.profile_plan = profile.get("tier") or self.profile_plan
             self.profile_display_name = profile.get("display_name") or self.profile_display_name
             self.profile_avatar_url = profile.get("photo_url") or self.profile_avatar_url
+        self._register_desktop_session_if_needed()
         self._profile_usage = max(0, int(usage or 0))
         self._profile_usage_last_refresh = time.time()
         self._update_user_status(refresh=False)

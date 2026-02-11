@@ -158,6 +158,9 @@ PLAN_LIMITS = {
     "Test": 330,
 }
 
+ADMIN_UNLIMITED_EMAIL = "admin@gmail.com"
+SINGLE_DEVICE_PLANS = {"free", "plus", "test", "standard"}
+
 # Cache for Firebase data (avoid repeated API calls)
 _firebase_cache: Dict[str, Any] = {
     "profile": None,
@@ -165,6 +168,27 @@ _firebase_cache: Dict[str, Any] = {
     "last_refresh": 0,
 }
 _CACHE_TTL = 60  # seconds
+
+
+def _is_admin_unlimited_user(uid: Optional[str] = None) -> bool:
+    """
+    Return True when current desktop user should bypass AI usage limits.
+    """
+    user = get_stored_user()
+    if not user:
+        return False
+
+    stored_uid = str(user.get("uid") or "")
+    if uid and stored_uid and str(uid) != stored_uid:
+        return False
+
+    email = str(user.get("email") or "").strip().lower()
+    return email == ADMIN_UNLIMITED_EMAIL
+
+
+def _is_single_device_plan(plan_or_tier: Any) -> bool:
+    normalized = _normalize_plan_tier(plan_or_tier, "free")
+    return normalized in SINGLE_DEVICE_PLANS
 
 
 class FirebaseProfileError(Exception):
@@ -651,6 +675,9 @@ def get_ai_usage(uid: str) -> int:
     """
     if not uid:
         return 0
+    if _is_admin_unlimited_user(uid):
+        # Unlimited users are exempt from usage counting.
+        return 0
 
     # 1) Canonical source: website usage API (same logic as web app)
     web_usage = _fetch_usage_status_from_web(uid)
@@ -702,6 +729,9 @@ def increment_ai_usage(uid: str) -> bool:
     """
     if not uid:
         return False
+    if _is_admin_unlimited_user(uid):
+        # Do not consume quota for admin unlimited account.
+        return True
 
     # 1) Canonical source: website usage API (same logic as web app)
     web_result = _increment_usage_via_web(uid)
@@ -823,6 +853,10 @@ def get_remaining_usage(uid: str, tier: str = "free") -> int:
     """
     Get remaining AI calls for today.
     """
+    if _is_admin_unlimited_user(uid):
+        # Large sentinel value to represent "practically unlimited".
+        return 10**9
+
     web_usage = _fetch_usage_status_from_web(uid)
     if web_usage is not None:
         return max(0, int(web_usage.get("remaining", 0)))
@@ -837,6 +871,9 @@ def check_usage_limit(uid: str, tier: str = "Free") -> bool:
     Check if user has remaining AI calls.
     Returns True if user can make more calls.
     """
+    if _is_admin_unlimited_user(uid):
+        return True
+
     web_usage = _fetch_usage_status_from_web(uid)
     if web_usage is not None:
         return bool(web_usage.get("canUse", False))
@@ -847,3 +884,91 @@ def get_plan_limit(tier: str) -> int:
     """Get the daily limit for a given plan/tier."""
     normalized = _normalize_plan_tier(tier, "free")
     return PLAN_LIMITS.get(normalized, PLAN_LIMITS.get("free", 5))
+
+
+def register_desktop_device_session(
+    uid: str,
+    desktop_session_id: str,
+    tier: str = "free",
+    email: str = "",
+) -> bool:
+    """
+    Register current desktop instance as active session.
+    Single-device plans (free/plus/test/standard) enforce one active desktop.
+    """
+    if not REQUESTS_AVAILABLE:
+        return False
+    if not uid or not desktop_session_id:
+        return False
+
+    email_norm = str(email or "").strip().lower()
+    if email_norm == ADMIN_UNLIMITED_EMAIL:
+        return True
+
+    normalized_tier = _normalize_plan_tier(tier, "free")
+    if not _is_single_device_plan(normalized_tier):
+        return True
+
+    try:
+        base = _resolve_usage_api_base_url()
+        url = f"{base}/api/auth/desktop-activate"
+        response = requests.post(
+            url,
+            json={
+                "uid": uid,
+                "desktopSessionId": desktop_session_id,
+                "tier": normalized_tier,
+                "plan": normalized_tier,
+                "email": email_norm,
+            },
+            timeout=10,
+            headers={"Content-Type": "application/json"},
+        )
+        return response.status_code == 200
+    except Exception:
+        return False
+
+
+def is_desktop_session_active(
+    uid: str,
+    desktop_session_id: str,
+    tier: str = "free",
+    email: str = "",
+) -> bool:
+    """
+    Check whether this desktop instance is still the active one.
+    Returns True when session is valid or when validation is unavailable.
+    """
+    if not REQUESTS_AVAILABLE:
+        return True
+    if not uid or not desktop_session_id:
+        return True
+
+    email_norm = str(email or "").strip().lower()
+    if email_norm == ADMIN_UNLIMITED_EMAIL:
+        return True
+
+    normalized_tier = _normalize_plan_tier(tier, "free")
+    if not _is_single_device_plan(normalized_tier):
+        return True
+
+    try:
+        base = _resolve_usage_api_base_url()
+        url = (
+            f"{base}/api/auth/desktop-session-status"
+            f"?userId={quote(uid, safe='')}"
+            f"&desktopSessionId={quote(desktop_session_id, safe='')}"
+        )
+        response = requests.get(
+            url,
+            timeout=8,
+            headers={"Cache-Control": "no-cache"},
+        )
+        if response.status_code != 200:
+            return True
+        payload = response.json()
+        if not isinstance(payload, dict):
+            return True
+        return bool(payload.get("active", True))
+    except Exception:
+        return True
