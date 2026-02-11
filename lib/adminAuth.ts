@@ -1,21 +1,8 @@
-import admin from "firebase-admin";
 import crypto from "crypto";
 import { ADMIN_EMAILS, ADMIN_EMAIL } from "@/lib/adminPortal";
+import getFirebaseAdmin from "@/lib/firebaseAdmin";
 
-// Initialize admin SDK once
-if (!admin.apps.length) {
-    if (process.env.FIREBASE_ADMIN_CREDENTIALS) {
-        try {
-            const creds = JSON.parse(process.env.FIREBASE_ADMIN_CREDENTIALS);
-            admin.initializeApp({ credential: admin.credential.cert(creds) });
-        } catch (err) {
-            console.error("Failed to parse FIREBASE_ADMIN_CREDENTIALS", err);
-            admin.initializeApp();
-        }
-    } else {
-        admin.initializeApp();
-    }
-}
+const admin = getFirebaseAdmin();
 
 const ADMIN_SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 const ADMIN_TOKEN_VERSION = 1;

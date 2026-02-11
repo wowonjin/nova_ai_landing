@@ -1,22 +1,9 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
-import admin from "firebase-admin";
+import getFirebaseAdmin from "@/lib/firebaseAdmin";
 
-// Initialize admin SDK once
-if (!admin.apps.length) {
-    if (process.env.FIREBASE_ADMIN_CREDENTIALS) {
-        try {
-            const creds = JSON.parse(process.env.FIREBASE_ADMIN_CREDENTIALS);
-            admin.initializeApp({ credential: admin.credential.cert(creds) });
-        } catch (err) {
-            console.error("Failed to parse FIREBASE_ADMIN_CREDENTIALS", err);
-            admin.initializeApp();
-        }
-    } else {
-        admin.initializeApp();
-    }
-}
+const admin = getFirebaseAdmin();
 
 const db = admin.firestore();
 
