@@ -1,12 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { getFirebaseAppOrNull } from "@/firebaseConfig";
+import {
+    ADMIN_EMAIL,
+    ADMIN_EMAILS,
+    ADMIN_PASSWORD,
+    ADMIN_SESSION_STORAGE_KEY,
+} from "@/lib/adminPortal";
 import "./admin.css";
 
 interface Stats {
+    dailyVisitors: number;
+    dailyDownloads: number;
+    totalSignups: number;
+    dailyRevenue: Array<{
+        date: string;
+        totalSales: number;
+        paymentCount: number;
+    }>;
     totalUsers: number;
     subscriptions: {
         active: number;
@@ -24,6 +38,7 @@ interface Stats {
         payments: { count: number; total: number };
         refunds: { count: number; total: number };
     };
+    warning?: string;
 }
 
 interface UserData {
@@ -40,6 +55,11 @@ interface UserData {
         failureCount: number;
         lastFailureReason?: string;
     };
+    usage: {
+        today: number;
+        limit: number;
+        remaining: number;
+    };
 }
 
 interface Payment {
@@ -55,11 +75,14 @@ interface Payment {
     card?: { company: string; number: string };
 }
 
-const ADMIN_EMAIL = "kinn@kinn.kr";
-
 export default function AdminPage() {
     const router = useRouter();
     const [authUser, setAuthUser] = useState<User | null>(null);
+    const [adminSessionToken, setAdminSessionToken] = useState<string | null>(
+        null,
+    );
+    const [portalAuthChecked, setPortalAuthChecked] = useState(false);
+    const [firebaseAuthChecked, setFirebaseAuthChecked] = useState(false);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<
         "dashboard" | "users" | "payments"
@@ -92,6 +115,17 @@ export default function AdminPage() {
         null,
     );
 
+    const getAdminAuthHeader = useCallback(async () => {
+        if (authUser) {
+            const token = await authUser.getIdToken();
+            return `Bearer ${token}`;
+        }
+        if (adminSessionToken) {
+            return `Bearer ${adminSessionToken}`;
+        }
+        return null;
+    }, [authUser, adminSessionToken]);
+
     // Handle payment deletion
     const handleDeletePayment = async (
         paymentKey: string,
@@ -108,12 +142,13 @@ export default function AdminPage() {
 
         setDeletingPaymentKey(paymentKey);
         try {
-            const token = await authUser?.getIdToken();
+            const authorization = await getAdminAuthHeader();
+            if (!authorization) throw new Error("관리자 인증이 필요합니다.");
             const response = await fetch(
                 `/api/admin/payments/${paymentKey}?userId=${userId}`,
                 {
                     method: "DELETE",
-                    headers: { Authorization: `Bearer ${token}` },
+                    headers: { Authorization: authorization },
                 },
             );
 
@@ -150,10 +185,11 @@ export default function AdminPage() {
 
         setDeletingUserId(userId);
         try {
-            const token = await authUser?.getIdToken();
+            const authorization = await getAdminAuthHeader();
+            if (!authorization) throw new Error("관리자 인증이 필요합니다.");
             const response = await fetch(`/api/admin/users/${userId}`, {
                 method: "DELETE",
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: authorization },
             });
 
             if (!response.ok) {
@@ -178,51 +214,114 @@ export default function AdminPage() {
     };
 
     useEffect(() => {
+        let active = true;
+        const token =
+            typeof window !== "undefined"
+                ? sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY)
+                : null;
+
+        const verifyPortalSession = async () => {
+            const tryAutoAdminLogin = async () => {
+                try {
+                    const loginResponse = await fetch("/api/admin/login", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            email: ADMIN_EMAIL,
+                            password: ADMIN_PASSWORD,
+                        }),
+                    });
+                    if (!loginResponse.ok) {
+                        if (active) setAdminSessionToken(null);
+                        return;
+                    }
+                    const loginData = await loginResponse.json();
+                    const nextToken = String(loginData?.token || "");
+                    if (!nextToken) {
+                        if (active) setAdminSessionToken(null);
+                        return;
+                    }
+                    if (active) {
+                        sessionStorage.setItem(
+                            ADMIN_SESSION_STORAGE_KEY,
+                            nextToken,
+                        );
+                        setAdminSessionToken(nextToken);
+                    }
+                } catch {
+                    if (active) setAdminSessionToken(null);
+                }
+            };
+
+            if (!token) {
+                await tryAutoAdminLogin();
+                if (active) {
+                    setPortalAuthChecked(true);
+                }
+                return;
+            }
+            try {
+                const response = await fetch("/api/admin/stats", {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!active) return;
+                if (response.ok) {
+                    setAdminSessionToken(token);
+                } else {
+                    sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+                    await tryAutoAdminLogin();
+                }
+            } catch {
+                if (active) {
+                    setAdminSessionToken(null);
+                }
+            } finally {
+                if (active) {
+                    setPortalAuthChecked(true);
+                }
+            }
+        };
+
+        void verifyPortalSession();
+
         const firebaseApp = getFirebaseAppOrNull();
         if (!firebaseApp) {
             setAuthUser(null);
-            setLoading(false);
-            return;
+            setFirebaseAuthChecked(true);
+            return () => {
+                active = false;
+            };
         }
+
         const auth = getAuth(firebaseApp);
         const unsubscribe = onAuthStateChanged(auth, (user) => {
-            console.log(
-                "Admin page auth check:",
-                user?.email,
-                "expected:",
-                ADMIN_EMAIL,
-            );
-
-            if (user === null) {
-                // User is not logged in
-                setLoading(false);
-                return;
-            }
-
-            // Case-insensitive email comparison
-            if (user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-                console.log("Not admin, redirecting...");
-                router.push("/");
-                return;
-            }
-
-            console.log("Admin verified!");
-            setAuthUser(user);
-            setLoading(false);
+            if (!active) return;
+            const isFirebaseAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
+            setAuthUser(isFirebaseAdmin ? user : null);
+            setFirebaseAuthChecked(true);
         });
-        return () => unsubscribe();
+
+        return () => {
+            active = false;
+            unsubscribe();
+        };
     }, [router]);
+
+    useEffect(() => {
+        setLoading(!(portalAuthChecked && firebaseAuthChecked));
+    }, [portalAuthChecked, firebaseAuthChecked]);
 
     // Fetch stats
     useEffect(() => {
-        if (!authUser) return;
+        if (!authUser && !adminSessionToken) return;
 
         const fetchStats = async () => {
             setStatsLoading(true);
             try {
-                const token = await authUser.getIdToken();
+                const authorization = await getAdminAuthHeader();
+                if (!authorization) return;
                 const response = await fetch("/api/admin/stats", {
-                    headers: { Authorization: `Bearer ${token}` },
+                    headers: { Authorization: authorization },
                 });
                 if (response.ok) {
                     const data = await response.json();
@@ -236,16 +335,17 @@ export default function AdminPage() {
         };
 
         fetchStats();
-    }, [authUser, activeTab]);
+    }, [authUser, adminSessionToken, activeTab, getAdminAuthHeader]);
 
     // Fetch users
     useEffect(() => {
-        if (!authUser || activeTab !== "users") return;
+        if ((!authUser && !adminSessionToken) || activeTab !== "users") return;
 
         const fetchUsers = async () => {
             setUsersLoading(true);
             try {
-                const token = await authUser.getIdToken();
+                const authorization = await getAdminAuthHeader();
+                if (!authorization) return;
                 const params = new URLSearchParams();
                 if (userSearch) params.set("search", userSearch);
                 if (userPlanFilter) params.set("plan", userPlanFilter);
@@ -254,7 +354,7 @@ export default function AdminPage() {
                 const response = await fetch(
                     `/api/admin/users?${params.toString()}`,
                     {
-                        headers: { Authorization: `Bearer ${token}` },
+                        headers: { Authorization: authorization },
                     },
                 );
                 if (response.ok) {
@@ -271,16 +371,26 @@ export default function AdminPage() {
 
         const debounce = setTimeout(fetchUsers, 300);
         return () => clearTimeout(debounce);
-    }, [authUser, activeTab, userSearch, userPlanFilter, userStatusFilter]);
+    }, [
+        authUser,
+        adminSessionToken,
+        activeTab,
+        getAdminAuthHeader,
+        userSearch,
+        userPlanFilter,
+        userStatusFilter,
+    ]);
 
     // Fetch payments
     useEffect(() => {
-        if (!authUser || activeTab !== "payments") return;
+        if ((!authUser && !adminSessionToken) || activeTab !== "payments")
+            return;
 
         const fetchPayments = async () => {
             setPaymentsLoading(true);
             try {
-                const token = await authUser.getIdToken();
+                const authorization = await getAdminAuthHeader();
+                if (!authorization) return;
                 const params = new URLSearchParams();
                 if (paymentSearch) params.set("search", paymentSearch);
                 if (paymentStatusFilter)
@@ -291,7 +401,7 @@ export default function AdminPage() {
                 const response = await fetch(
                     `/api/admin/payments?${params.toString()}`,
                     {
-                        headers: { Authorization: `Bearer ${token}` },
+                        headers: { Authorization: authorization },
                     },
                 );
                 if (response.ok) {
@@ -310,7 +420,9 @@ export default function AdminPage() {
         return () => clearTimeout(debounce);
     }, [
         authUser,
+        adminSessionToken,
         activeTab,
+        getAdminAuthHeader,
         paymentSearch,
         paymentStatusFilter,
         paymentStartDate,
@@ -326,7 +438,7 @@ export default function AdminPage() {
         );
     }
 
-    if (!authUser) {
+    if (!authUser && !adminSessionToken) {
         return (
             <div className="admin-loading">
                 <div style={{ textAlign: "center" }}>
@@ -387,19 +499,81 @@ export default function AdminPage() {
                             </div>
                         ) : stats ? (
                             <>
+                                {stats.warning && (
+                                    <div className="admin-section">
+                                        <p className="admin-refund-info">
+                                            Firebase Admin 설정이 없어 실데이터를
+                                            불러오지 못했습니다. 현재는 0값으로
+                                            표시됩니다.
+                                        </p>
+                                    </div>
+                                )}
                                 <div className="admin-stats-grid">
                                     <div className="admin-stat-card">
-                                        <h3>총 사용자</h3>
+                                        <h3>일 방문자 수</h3>
                                         <p className="admin-stat-value">
-                                            {stats.totalUsers.toLocaleString()}
+                                            {stats.dailyVisitors.toLocaleString()}
                                         </p>
                                     </div>
                                     <div className="admin-stat-card">
-                                        <h3>활성 구독</h3>
+                                        <h3>일 다운로드 수</h3>
                                         <p className="admin-stat-value">
-                                            {stats.subscriptions.active.toLocaleString()}
+                                            {stats.dailyDownloads.toLocaleString()}
                                         </p>
                                     </div>
+                                    <div className="admin-stat-card">
+                                        <h3>회원가입 인원</h3>
+                                        <p className="admin-stat-value">
+                                            {stats.totalSignups.toLocaleString()}
+                                        </p>
+                                    </div>
+                                    <div className="admin-stat-card">
+                                        <h3>오늘 총 매출</h3>
+                                        <p className="admin-stat-value">
+                                            {(
+                                                stats.dailyRevenue[0]
+                                                    ?.totalSales || 0
+                                            ).toLocaleString()}
+                                            원
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="admin-section">
+                                    <h2>일자별 총 매출</h2>
+                                    <div className="admin-table-wrapper">
+                                        <table className="admin-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>일자</th>
+                                                    <th>결제 건수</th>
+                                                    <th>총 매출</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {stats.dailyRevenue.map(
+                                                    (daily) => (
+                                                        <tr key={daily.date}>
+                                                            <td>{daily.date}</td>
+                                                            <td>
+                                                                {
+                                                                    daily.paymentCount
+                                                                }
+                                                                건
+                                                            </td>
+                                                            <td>
+                                                                {daily.totalSales.toLocaleString()}
+                                                                원
+                                                            </td>
+                                                        </tr>
+                                                    ),
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div className="admin-stats-grid">
                                     <div className="admin-stat-card">
                                         <h3>월간 반복 수익 (MRR)</h3>
                                         <p className="admin-stat-value">
@@ -551,6 +725,8 @@ export default function AdminPage() {
                                             <th>이름</th>
                                             <th>플랜</th>
                                             <th>상태</th>
+                                            <th>오늘 사용량</th>
+                                            <th>남은 사용량</th>
                                             <th>금액</th>
                                             <th>다음 결제일</th>
                                             <th>실패 횟수</th>
@@ -580,6 +756,13 @@ export default function AdminPage() {
                                                                 .status
                                                         }
                                                     </span>
+                                                </td>
+                                                <td>
+                                                    {user.usage?.today ?? 0} /{" "}
+                                                    {user.usage?.limit ?? 0}
+                                                </td>
+                                                <td>
+                                                    {user.usage?.remaining ?? 0}
                                                 </td>
                                                 <td>
                                                     {user.subscription.amount?.toLocaleString()}

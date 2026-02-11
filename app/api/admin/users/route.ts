@@ -2,8 +2,32 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdmin, admin } from "@/lib/adminAuth";
+import { getTierLimit, PlanTier } from "@/lib/tierLimits";
 
 const db = admin.firestore();
+
+interface AdminUserListItem {
+    uid: string;
+    email: string;
+    displayName: string;
+    photoURL: string;
+    createdAt: string;
+    subscription: {
+        plan: string;
+        status: string;
+        amount: number;
+        billingCycle: string;
+        startDate: string;
+        nextBillingDate: string;
+        failureCount: number;
+        lastFailureReason?: string;
+    };
+    usage: {
+        today: number;
+        limit: number;
+        remaining: number;
+    };
+}
 
 /**
  * GET /api/admin/users
@@ -31,7 +55,7 @@ export async function GET(request: NextRequest) {
         const usersRef = db.collection("users");
         const usersSnapshot = await usersRef.get();
 
-        let users: any[] = [];
+        let users: AdminUserListItem[] = [];
 
         usersSnapshot.forEach((doc) => {
             const data = doc.data();
@@ -40,8 +64,11 @@ export async function GET(request: NextRequest) {
             // Apply filters
             const email = data.email?.toLowerCase() || "";
             const displayName = data.displayName?.toLowerCase() || "";
-            const plan = subscription.plan || "free";
+            const plan = (subscription.plan || data.plan || "free") as PlanTier;
             const status = subscription.status || "none";
+            const todayUsage = data.aiCallUsage || 0;
+            const usageLimit = getTierLimit(plan);
+            const remainingUsage = Math.max(0, usageLimit - todayUsage);
 
             // Search filter
             if (
@@ -78,6 +105,11 @@ export async function GET(request: NextRequest) {
                     failureCount: subscription.failureCount || 0,
                     lastFailureReason: subscription.lastFailureReason,
                 },
+                usage: {
+                    today: todayUsage,
+                    limit: usageLimit,
+                    remaining: remainingUsage,
+                },
             });
         });
 
@@ -101,9 +133,13 @@ export async function GET(request: NextRequest) {
         });
     } catch (error) {
         console.error("Admin users error:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch users" },
-            { status: 500 },
-        );
+        return NextResponse.json({
+            users: [],
+            total: 0,
+            limit: 50,
+            offset: 0,
+            warning:
+                "firebase_admin_not_configured: check FIREBASE_ADMIN_CREDENTIALS and project settings",
+        });
     }
 }

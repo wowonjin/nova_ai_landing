@@ -527,6 +527,62 @@ nextjs-portal {
     color: #dc2626;
 }
 
+/* Navbar Usage Section */
+.nav-usage-section {
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    background: rgba(59, 130, 246, 0.06);
+}
+
+.nav-usage-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--foreground);
+    margin-bottom: 0.5rem;
+}
+
+.nav-usage-header svg {
+    color: #3b82f6;
+}
+
+.nav-usage-bar-bg {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.nav-usage-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.4s ease;
+}
+
+.nav-usage-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.4rem;
+}
+
+.nav-usage-remaining {
+    font-size: 0.75rem;
+    color: #3b82f6;
+}
+
+.nav-usage-remaining strong {
+    font-weight: 700;
+}
+
+.nav-usage-total {
+    font-size: 0.7rem;
+    color: var(--muted-foreground);
+}
+
 /* 모바일에서 프로필 정보 숨김 */
 @media (max-width: 768px) {
     .nav-profile-info {
@@ -2118,21 +2174,35 @@ nextjs-portal {
 /* ========================================
    📜 SCROLLBAR
    ======================================== */
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+/* Webkit (Chrome, Edge, Safari) */
 ::-webkit-scrollbar {
-    width: 10px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-    background: #0a0a0a;
+    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #9f9f9f;
-    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 999px;
+    transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #b0b0b0;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
 }
 
 /* ========================================
@@ -2303,7 +2373,7 @@ nextjs-portal {
 }
 
 .process-showcase-desc {
-    font-size: 0.8125rem;
+    font-size: 0.9375rem;
     line-height: 1.55;
     color: var(--muted-foreground);
     margin: 0;
@@ -2384,7 +2454,7 @@ nextjs-portal {
     }
 
     .process-showcase-desc {
-        font-size: 0.75rem;
+        font-size: 0.875rem;
         max-width: 100%;
     }
 }

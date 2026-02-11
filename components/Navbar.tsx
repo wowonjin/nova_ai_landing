@@ -8,6 +8,11 @@ export function Navbar() {
     const { isAuthenticated, avatar, logout, user } = useAuth();
     const [displayName, setDisplayName] = useState<string | null>(null);
     const [userPlan, setUserPlan] = useState<string>("free");
+    const [aiUsage, setAiUsage] = useState<{
+        currentUsage: number;
+        limit: number;
+        remaining: number;
+    } | null>(null);
 
     useEffect(() => {
         let mounted = true;
@@ -16,6 +21,7 @@ export function Navbar() {
                 if (mounted) {
                     setDisplayName(null);
                     setUserPlan("free");
+                    setAiUsage(null);
                 }
                 return;
             }
@@ -31,10 +37,28 @@ export function Navbar() {
                 if (mounted && snap.exists()) {
                     const data = snap.data() as any;
                     setDisplayName(data?.displayName ?? null);
-                    // Get plan from subscription or default to free
                     const plan =
                         data?.subscription?.plan || data?.plan || "free";
                     setUserPlan(plan);
+                }
+            } catch (err) {
+                // non-fatal
+            }
+
+            // Fetch AI usage data
+            try {
+                const res = await fetch(
+                    `/api/ai/check-limit?userId=${user.uid}`,
+                );
+                if (res.ok) {
+                    const data = await res.json();
+                    if (mounted) {
+                        setAiUsage({
+                            currentUsage: data.currentUsage,
+                            limit: data.limit,
+                            remaining: data.remaining,
+                        });
+                    }
                 }
             } catch (err) {
                 // non-fatal
@@ -152,6 +176,59 @@ export function Navbar() {
                             </button>
                             {menuOpen && (
                                 <div className="nav-profile-dropdown">
+                                    {/* 오늘 사용량 */}
+                                    {aiUsage && (
+                                        <div className="nav-usage-section">
+                                            <div className="nav-usage-header">
+                                                <svg
+                                                    width="14"
+                                                    height="14"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                >
+                                                    <path d="M12 20V10" />
+                                                    <path d="M18 20V4" />
+                                                    <path d="M6 20v-4" />
+                                                </svg>
+                                                <span>오늘 사용량</span>
+                                            </div>
+                                            <div className="nav-usage-bar-bg">
+                                                <div
+                                                    className="nav-usage-bar-fill"
+                                                    style={{
+                                                        width: `${Math.min(
+                                                            (aiUsage.currentUsage /
+                                                                aiUsage.limit) *
+                                                                100,
+                                                            100,
+                                                        )}%`,
+                                                        backgroundColor:
+                                                            aiUsage.currentUsage >=
+                                                            aiUsage.limit
+                                                                ? "#ef4444"
+                                                                : "#3b82f6",
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="nav-usage-info">
+                                                <span className="nav-usage-remaining">
+                                                    남은 횟수:{" "}
+                                                    <strong>
+                                                        {aiUsage.remaining}
+                                                    </strong>
+                                                </span>
+                                                <span className="nav-usage-total">
+                                                    {aiUsage.currentUsage} /{" "}
+                                                    {aiUsage.limit}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="nav-profile-dropdown-divider"></div>
                                     <a
                                         href="/profile"
                                         className="nav-profile-dropdown-item"

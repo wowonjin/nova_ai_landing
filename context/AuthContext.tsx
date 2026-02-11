@@ -118,8 +118,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 } else {
                     if (firebaseUser && !prevUserRef.current) {
                         try {
-                            // Immediately navigate to profile after a fresh login
-                            window.location.href = "/profile";
+                            const isOnLoginPage =
+                                window.location.pathname === "/login";
+                            // Let the login page handle post-login redirects.
+                            if (!isOnLoginPage) {
+                                window.location.href = "/profile";
+                            }
                         } catch (e) {
                             /* ignore navigation errors */
                         }

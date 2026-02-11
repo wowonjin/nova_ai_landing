@@ -5,6 +5,36 @@ import { verifyAdmin, admin } from "@/lib/adminAuth";
 
 const db = admin.firestore();
 
+function getEmptyStats() {
+    return {
+        dailyVisitors: 0,
+        dailyDownloads: 0,
+        totalSignups: 0,
+        dailyRevenue: [],
+        totalUsers: 0,
+        subscriptions: {
+            active: 0,
+            cancelled: 0,
+            suspended: 0,
+            free: 0,
+        },
+        planCounts: {
+            free: 0,
+            plus: 0,
+            pro: 0,
+        },
+        revenue: {
+            monthlyRecurring: 0,
+            yearlyRecurring: 0,
+            totalMRR: 0,
+        },
+        recentActivity: {
+            payments: { count: 0, total: 0 },
+            refunds: { count: 0, total: 0 },
+        },
+    };
+}
+
 /**
  * GET /api/admin/stats
  * Returns dashboard statistics for admin
@@ -21,10 +51,22 @@ export async function GET(request: NextRequest) {
 
     try {
         const usersRef = db.collection("users");
+        const todayKey = new Date().toISOString().slice(0, 10);
+        const todayAnalyticsRef = db.collection("analyticsDaily").doc(todayKey);
 
         // Get all users
-        const usersSnapshot = await usersRef.get();
+        const [usersSnapshot, todayAnalyticsSnap] = await Promise.all([
+            usersRef.get(),
+            todayAnalyticsRef.get(),
+        ]);
         const totalUsers = usersSnapshot.size;
+        const totalSignups = totalUsers;
+        const dailyVisitors = todayAnalyticsSnap.exists
+            ? (todayAnalyticsSnap.data()?.visitors ?? 0)
+            : 0;
+        const dailyDownloads = todayAnalyticsSnap.exists
+            ? (todayAnalyticsSnap.data()?.downloads ?? 0)
+            : 0;
 
         let activeSubscriptions = 0;
         let cancelledSubscriptions = 0;
@@ -80,6 +122,10 @@ export async function GET(request: NextRequest) {
         let recentPaymentsTotal = 0;
         let recentRefundsCount = 0;
         let recentRefundsTotal = 0;
+        const dailyRevenueMap: Record<
+            string,
+            { totalSales: number; paymentCount: number }
+        > = {};
 
         // Query all users and their payments subcollection
         for (const userDoc of usersSnapshot.docs) {
@@ -96,6 +142,17 @@ export async function GET(request: NextRequest) {
                 if (payment.status === "DONE") {
                     recentPaymentsCount++;
                     recentPaymentsTotal += payment.amount || 0;
+                    const dateKey = String(payment.approvedAt || "").slice(0, 10);
+                    if (dateKey) {
+                        const prev = dailyRevenueMap[dateKey] || {
+                            totalSales: 0,
+                            paymentCount: 0,
+                        };
+                        dailyRevenueMap[dateKey] = {
+                            totalSales: prev.totalSales + (payment.amount || 0),
+                            paymentCount: prev.paymentCount + 1,
+                        };
+                    }
                 } else if (payment.status === "REFUNDED") {
                     recentRefundsCount++;
                     recentRefundsTotal += payment.amount || 0;
@@ -103,7 +160,19 @@ export async function GET(request: NextRequest) {
             });
         }
 
+        const dailyRevenue = Object.entries(dailyRevenueMap)
+            .sort(([a], [b]) => b.localeCompare(a))
+            .map(([date, revenue]) => ({
+                date,
+                totalSales: revenue.totalSales,
+                paymentCount: revenue.paymentCount,
+            }));
+
         return NextResponse.json({
+            dailyVisitors,
+            dailyDownloads,
+            totalSignups,
+            dailyRevenue,
             totalUsers,
             subscriptions: {
                 active: activeSubscriptions,
@@ -130,9 +199,10 @@ export async function GET(request: NextRequest) {
         });
     } catch (error) {
         console.error("Admin stats error:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch stats" },
-            { status: 500 },
-        );
+        return NextResponse.json({
+            ...getEmptyStats(),
+            warning:
+                "firebase_admin_not_configured: check FIREBASE_ADMIN_CREDENTIALS and project settings",
+        });
     }
 }

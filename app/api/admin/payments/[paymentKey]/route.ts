@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import getFirebaseAdmin from "@/lib/firebaseAdmin";
-
-const ADMIN_EMAIL = "kinn@kinn.kr";
+import { verifyAdmin, admin } from "@/lib/adminAuth";
 
 /**
  * DELETE /api/admin/payments/[paymentKey]
@@ -9,39 +7,15 @@ const ADMIN_EMAIL = "kinn@kinn.kr";
  */
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: Promise<{ paymentKey: string }> }
+    { params }: { params: Promise<{ paymentKey: string }> },
 ) {
     try {
         const { paymentKey } = await params;
-
-        // Verify admin authentication
-        const authHeader = request.headers.get("authorization");
-        if (!authHeader?.startsWith("Bearer ")) {
+        const adminUser = await verifyAdmin(request.headers.get("Authorization"));
+        if (!adminUser) {
             return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 }
-            );
-        }
-
-        const token = authHeader.split("Bearer ")[1];
-        const admin = getFirebaseAdmin();
-
-        let decodedToken;
-        try {
-            decodedToken = await admin.auth().verifyIdToken(token);
-        } catch (error) {
-            return NextResponse.json(
-                { error: "Invalid token" },
-                { status: 401 }
-            );
-        }
-
-        // Check if user is admin
-        const userRecord = await admin.auth().getUser(decodedToken.uid);
-        if (userRecord.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-            return NextResponse.json(
-                { error: "Forbidden" },
-                { status: 403 }
+                { error: "Unauthorized - Admin access required" },
+                { status: 403 },
             );
         }
 
@@ -52,7 +26,7 @@ export async function DELETE(
         if (!userId) {
             return NextResponse.json(
                 { error: "userId is required" },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
@@ -69,7 +43,7 @@ export async function DELETE(
         if (!paymentDoc.exists) {
             return NextResponse.json(
                 { error: "Payment not found" },
-                { status: 404 }
+                { status: 404 },
             );
         }
 
@@ -81,7 +55,7 @@ export async function DELETE(
             success: true,
             message: "Payment deleted successfully",
         });
-    } catch (error) {
+    } catch (error: unknown) {
         console.error("Delete payment error:", error);
         return NextResponse.json(
             {
@@ -90,7 +64,7 @@ export async function DELETE(
                         ? error.message
                         : "Internal server error",
             },
-            { status: 500 }
+            { status: 500 },
         );
     }
 }

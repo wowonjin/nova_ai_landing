@@ -8,6 +8,11 @@ import { Navbar } from "../../components/Navbar";
 import Sidebar from "../(home)/SidebarDynamic";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { getFirebaseAppOrNull } from "../../firebaseConfig";
+import {
+    ADMIN_EMAIL,
+    ADMIN_PASSWORD,
+    ADMIN_SESSION_STORAGE_KEY,
+} from "@/lib/adminPortal";
 import "./login.css";
 import "../style.css";
 import "../mobile.css";
@@ -66,8 +71,26 @@ function LoginContent() {
 
     // Helper function to handle redirect after successful login
     const handlePostLoginRedirect = async (user: any) => {
+        const postLoginAction = searchParams?.get("postLoginAction");
+        const amount = searchParams?.get("amount");
+        const orderName = searchParams?.get("orderName");
         const redirectUri = searchParams?.get("redirect_uri");
         const sessionId = searchParams?.get("session");
+
+        if (
+            postLoginAction === "payment" &&
+            amount &&
+            orderName &&
+            !Number.isNaN(Number(amount))
+        ) {
+            const homeParams = new URLSearchParams({
+                openPayment: "true",
+                amount,
+                orderName,
+            });
+            window.location.href = `/?${homeParams.toString()}`;
+            return;
+        }
 
         if (sessionId) {
             // Server-side OAuth flow for Python app
@@ -170,6 +193,33 @@ function LoginContent() {
                 setInfo("회원가입이 완료되었습니다. 자동으로 로그인됩니다.");
                 await handlePostLoginRedirect(user);
             } else {
+                const normalizedEmail = form.email.trim().toLowerCase();
+                if (
+                    normalizedEmail === ADMIN_EMAIL &&
+                    form.password === ADMIN_PASSWORD
+                ) {
+                    const response = await fetch("/api/admin/login", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            email: normalizedEmail,
+                            password: form.password,
+                        }),
+                    });
+                    if (!response.ok) {
+                        throw new Error("관리자 로그인에 실패했습니다.");
+                    }
+                    const data = await response.json();
+                    if (typeof window !== "undefined") {
+                        sessionStorage.setItem(
+                            ADMIN_SESSION_STORAGE_KEY,
+                            data.token,
+                        );
+                    }
+                    window.location.href = "/admin";
+                    return;
+                }
+
                 const user = await loginWithEmail(form.email, form.password);
                 await handlePostLoginRedirect(user);
             }

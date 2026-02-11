@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 const CheckIcon = ({ color = "currentColor" }: { color?: string }) => (
     <svg
@@ -80,17 +81,38 @@ const plans: PricingPlan[] = [
 
 export default function Pricing() {
     const router = useRouter();
+    const { isAuthenticated, loading } = useAuth();
+
+    const paymentMetaByTier: Record<"plus" | "pro", { amount: number; orderName: string }> = {
+        plus: { amount: 19900, orderName: "Nova AI 플러스 요금제" },
+        pro: { amount: 49900, orderName: "Nova AI 프로 요금제" },
+    };
 
     const handlePlanClick = (tier: PricingPlan["tier"]) => {
         if (tier === "free") {
             router.push("/login");
-        } else if (tier === "plus") {
-            router.push(
-                "/payment?amount=19900&orderName=Nova AI 플러스 요금제",
-            );
-        } else if (tier === "pro") {
-            router.push("/payment?amount=49900&orderName=Nova AI 프로 요금제");
+            return;
         }
+
+        if (loading) return;
+
+        const paymentMeta = paymentMetaByTier[tier];
+        const paymentParams = new URLSearchParams({
+            amount: String(paymentMeta.amount),
+            orderName: paymentMeta.orderName,
+        });
+
+        if (!isAuthenticated) {
+            const loginParams = new URLSearchParams({
+                postLoginAction: "payment",
+                amount: String(paymentMeta.amount),
+                orderName: paymentMeta.orderName,
+            });
+            router.push(`/login?${loginParams.toString()}`);
+            return;
+        }
+
+        router.push(`/?openPayment=true&${paymentParams.toString()}`);
     };
 
     return (

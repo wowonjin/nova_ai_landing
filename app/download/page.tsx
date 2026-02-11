@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import AOS from "aos";
 import "aos/dist/aos.css";
 import { Navbar } from "../../components/Navbar";
@@ -15,6 +15,21 @@ import Image from "next/image";
 
 export default function DownloadContent() {
     const [hoveredPlatform, setHoveredPlatform] = useState<string | null>(null);
+    const [activeSlide, setActiveSlide] = useState(0);
+    const [isDragging, setIsDragging] = useState(false);
+    const viewportRef = useRef<HTMLDivElement | null>(null);
+    const isMouseDownRef = useRef(false);
+    const dragStartXRef = useRef(0);
+    const dragStartScrollLeftRef = useRef(0);
+    const hasDraggedRef = useRef(false);
+
+    const setupSteps = [
+        { img: "/setup11.png", step: 1 },
+        { img: "/setup12.png", step: 2 },
+        { img: "/setup13.png", step: 3 },
+        { img: "/setup14.png", step: 4 },
+        { img: "/setup15.png", step: 5 },
+    ];
 
     // GitHub Releases - Update version tag (v1.0.0) when releasing new versions
     const GITHUB_RELEASE_BASE =
@@ -24,8 +39,7 @@ export default function DownloadContent() {
         {
             name: "Windows",
             img: "/windows.png",
-            link: `${GITHUB_RELEASE_BASE}/nova-ai-setup-windows.exe`,
-            liteLink: `${GITHUB_RELEASE_BASE}/nova-ai-lite-setup-windows.exe`,
+            link: "https://storage.googleapis.com/physics2/NovaAI_Setup_1.0.0.exe",
             desc: "Windows 10 이상",
             size: "104 MB",
         },
@@ -46,6 +60,97 @@ export default function DownloadContent() {
             once: false,
         });
     }, []);
+
+    useEffect(() => {
+        void fetch("/api/analytics/visit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ page: "/download" }),
+        }).catch(() => {
+            // Non-blocking analytics call
+        });
+    }, []);
+
+    /** Get the width of one slide (including its share of the gap). */
+    const getSlideStep = (viewport: HTMLDivElement) => {
+        const slide = viewport.querySelector(
+            ".download-guide-slide",
+        ) as HTMLElement | null;
+        if (!slide) return 0;
+        // slideWidth + gap between slides
+        return slide.offsetWidth + 16; // 1rem gap = 16px
+    };
+
+    /** From current scrollLeft, figure out the nearest slide index. */
+    const getNearestSlideIndex = (viewport: HTMLDivElement) => {
+        const step = getSlideStep(viewport);
+        if (step === 0) return 0;
+        const raw = viewport.scrollLeft / step;
+        return Math.max(
+            0,
+            Math.min(setupSteps.length - 1, Math.round(raw)),
+        );
+    };
+
+    /** Smoothly scroll so that slide `index` is at the left edge. */
+    const scrollToSlide = (index: number) => {
+        const viewport = viewportRef.current;
+        if (!viewport) return;
+        const step = getSlideStep(viewport);
+        const maxScroll = viewport.scrollWidth - viewport.clientWidth;
+        const target = Math.min(index * step, maxScroll);
+        viewport.scrollTo({ left: target, behavior: "smooth" });
+        setActiveSlide(index);
+    };
+
+    /* ---- Drag handlers ---- */
+
+    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        const viewport = viewportRef.current;
+        if (!viewport) return;
+
+        isMouseDownRef.current = true;
+        hasDraggedRef.current = false;
+        setIsDragging(true);
+        dragStartXRef.current = e.clientX;
+        dragStartScrollLeftRef.current = viewport.scrollLeft;
+
+        // Disable smooth scrolling while dragging so scrollLeft updates instantly.
+        viewport.style.scrollBehavior = "auto";
+    };
+
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!isMouseDownRef.current) return;
+        const viewport = viewportRef.current;
+        if (!viewport) return;
+
+        const dx = e.clientX - dragStartXRef.current;
+        if (Math.abs(dx) > 4) hasDraggedRef.current = true;
+        viewport.scrollLeft = dragStartScrollLeftRef.current - dx;
+    };
+
+    const endDrag = () => {
+        if (!isMouseDownRef.current) return;
+        isMouseDownRef.current = false;
+        setIsDragging(false);
+
+        const viewport = viewportRef.current;
+        if (!viewport) return;
+
+        // Restore smooth scrolling for the snap animation.
+        viewport.style.scrollBehavior = "smooth";
+
+        const nearest = getNearestSlideIndex(viewport);
+        scrollToSlide(nearest);
+    };
+
+    /** Keep activeSlide in sync when user scrolls via trackpad / touch. */
+    const handleScroll = () => {
+        if (isMouseDownRef.current) return;
+        const viewport = viewportRef.current;
+        if (!viewport) return;
+        setActiveSlide(getNearestSlideIndex(viewport));
+    };
 
     return (
         <div className="download-page">
@@ -118,7 +223,21 @@ export default function DownloadContent() {
                                     href={p.link}
                                     download
                                     className="download-card-button"
-                                    onClick={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        void fetch("/api/analytics/download", {
+                                            method: "POST",
+                                            headers: {
+                                                "Content-Type":
+                                                    "application/json",
+                                            },
+                                            body: JSON.stringify({
+                                                platform: p.name.toLowerCase(),
+                                            }),
+                                        }).catch(() => {
+                                            // Non-blocking analytics call
+                                        });
+                                    }}
                                     aria-label={`${p.name} 다운로드`}
                                 >
                                     <svg
@@ -136,53 +255,59 @@ export default function DownloadContent() {
                                         <line x1="12" y1="15" x2="12" y2="3" />
                                     </svg>
                                 </a>
-                                {p.name === "Windows" && p.liteLink && (
-                                    <a
-                                        href={p.liteLink}
-                                        download
-                                        className="download-card-button download-card-button--lite"
-                                        onClick={(e) => e.stopPropagation()}
-                                        aria-label="Windows Lite 다운로드"
-                                    >
-                                        Lite
-                                    </a>
-                                )}
                             </div>
                         </div>
                     ))}
                 </section>
 
-                {/* Installation Steps */}
-                <section className="download-steps" data-aos="fade-up">
-                    <h2 className="download-steps-title">간단한 3단계 설치</h2>
-                    <div className="download-steps-grid">
-                        <div className="download-step">
-                            <div className="download-step-number">1</div>
-                            <h3 className="download-step-title">다운로드</h3>
-                            <p className="download-step-desc">
-                                운영체제에 맞는 설치 파일을
-                                <br />
-                                다운로드하세요.
-                            </p>
+                {/* Installation Guide - Carousel */}
+                <section className="download-guide" data-aos="fade-up">
+                    <h2 className="download-guide-title">설치 방법</h2>
+                    <div className="download-guide-carousel">
+                        <div
+                            ref={viewportRef}
+                            className={`download-guide-viewport ${
+                                isDragging ? "is-dragging" : ""
+                            }`}
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={endDrag}
+                            onMouseLeave={endDrag}
+                            onScroll={handleScroll}
+                        >
+                            <div
+                                className="download-guide-track"
+                            >
+                                {setupSteps.map((item) => (
+                                    <div key={item.step} className="download-guide-slide">
+                                        <div className="download-guide-image-wrapper">
+                                            <span className="download-guide-image-label">
+                                                {`setup${item.step}`}
+                                            </span>
+                                            <Image
+                                                src={item.img}
+                                                alt={`설치 방법 ${item.step}단계`}
+                                                width={600}
+                                                height={600}
+                                                className="download-guide-image"
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                        <div className="download-step">
-                            <div className="download-step-number">2</div>
-                            <h3 className="download-step-title">설치</h3>
-                            <p className="download-step-desc">
-                                다운로드한 파일을 실행하고
-                                <br />
-                                안내를 따르세요.
-                            </p>
-                        </div>
-                        <div className="download-step">
-                            <div className="download-step-number">3</div>
-                            <h3 className="download-step-title">시작</h3>
-                            <p className="download-step-desc">
-                                Nova AI를 실행하고
-                                <br />
-                                마법같은 문서 자동화를 경험하세요.
-                            </p>
-                        </div>
+                    </div>
+
+                    {/* Step indicator dots */}
+                    <div className="download-guide-dots">
+                        {setupSteps.slice(0, -1).map((item, index) => (
+                            <button
+                                key={item.step}
+                                className={`download-guide-dot ${activeSlide === index ? "active" : ""}`}
+                                onClick={() => scrollToSlide(index)}
+                                aria-label={`${index + 1}번 이미지로 이동`}
+                            />
+                        ))}
                     </div>
                 </section>
 
