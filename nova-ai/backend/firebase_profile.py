@@ -565,9 +565,24 @@ def refresh_user_profile_from_firebase() -> Optional[Dict[str, Any]]:
         return None
     
     uid = user["uid"]
+    # Prefer the same canonical usage/plan source used by the web app.
+    usage_status = _fetch_usage_status_from_web(uid)
+    usage_plan = _normalize_plan_tier(
+        (usage_status or {}).get("plan"),
+        _normalize_plan_tier(user.get("plan") or user.get("tier"), "free"),
+    )
+    usage_count = int((usage_status or {}).get("currentUsage") or 0)
     auth_token, auth_mode = _resolve_firestore_auth_token()
     if not auth_token:
-        return None
+        return {
+            "uid": uid,
+            "tier": usage_plan,
+            "plan": usage_plan,
+            "display_name": user.get("name", ""),
+            "email": user.get("email", ""),
+            "photo_url": user.get("photo_url", ""),
+            "aiCallUsage": usage_count,
+        }
     
     try:
         project_id = FIREBASE_CONFIG["projectId"]
@@ -596,6 +611,7 @@ def refresh_user_profile_from_firebase() -> Optional[Dict[str, Any]]:
                 get_value(fields.get("plan", {}))
                 or get_value(subscription_fields.get("plan", {}))
                 or get_value(fields.get("tier", {}))
+                or usage_plan
                 or user.get("plan")
                 or user.get("tier"),
                 "free",
@@ -612,7 +628,11 @@ def refresh_user_profile_from_firebase() -> Optional[Dict[str, Any]]:
                     or get_value(fields.get("photoURL", {}))
                     or user.get("photo_url", "")
                 ),
-                "aiCallUsage": get_value(fields.get("aiCallUsage", {})) or 0,
+                "aiCallUsage": (
+                    usage_count
+                    if usage_status is not None
+                    else get_value(fields.get("aiCallUsage", {})) or 0
+                ),
             }
             
             # Update local cache if plan/tier changed
@@ -628,15 +648,39 @@ def refresh_user_profile_from_firebase() -> Optional[Dict[str, Any]]:
             id_token = refresh_id_token()
             if id_token:
                 return refresh_user_profile_from_firebase()  # Retry once
-            return None
+            return {
+                "uid": uid,
+                "tier": usage_plan,
+                "plan": usage_plan,
+                "display_name": user.get("name", ""),
+                "email": user.get("email", ""),
+                "photo_url": user.get("photo_url", ""),
+                "aiCallUsage": usage_count,
+            }
         
         else:
             print(f"Firebase profile fetch failed: {status_code}")
-            return None
+            return {
+                "uid": uid,
+                "tier": usage_plan,
+                "plan": usage_plan,
+                "display_name": user.get("name", ""),
+                "email": user.get("email", ""),
+                "photo_url": user.get("photo_url", ""),
+                "aiCallUsage": usage_count,
+            }
             
     except Exception as e:
         print(f"Firebase profile refresh error: {e}")
-        return None
+        return {
+            "uid": uid,
+            "tier": usage_plan,
+            "plan": usage_plan,
+            "display_name": user.get("name", ""),
+            "email": user.get("email", ""),
+            "photo_url": user.get("photo_url", ""),
+            "aiCallUsage": usage_count,
+        }
 
 
 def get_user_profile(uid: str) -> Optional[Dict[str, Any]]:

@@ -1738,7 +1738,7 @@ class NovaAILiteWindow(QWidget):
         if user and user.get("uid"):
             self.profile_uid = user.get("uid")
             self.profile_display_name = user.get("name") or "사용자"
-            self.profile_plan = user.get("tier") or "Free"
+            self.profile_plan = user.get("plan") or user.get("tier") or "Free"
             self.profile_avatar_url = user.get("photo_url")
         else:
             self.profile_uid = None
@@ -2074,7 +2074,11 @@ class NovaAILiteWindow(QWidget):
 
     def _on_profile_refreshed(self, profile: dict, usage: int) -> None:
         if profile:
-            self.profile_plan = profile.get("tier") or self.profile_plan
+            self.profile_plan = (
+                profile.get("plan")
+                or profile.get("tier")
+                or self.profile_plan
+            )
             self.profile_display_name = profile.get("display_name") or self.profile_display_name
             self.profile_avatar_url = profile.get("photo_url") or self.profile_avatar_url
         self._register_desktop_session_if_needed()
