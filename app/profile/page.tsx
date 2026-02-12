@@ -124,7 +124,7 @@ const plansData: PlanData[] = [
         yearlyPrice: 0,
         icon: <SparklesIcon />,
         features: [
-            { text: "하루 5회 AI 생성", included: true },
+            { text: "총 5회 AI 타이핑 생성", included: true },
             { text: "기본 수식 자동화", included: true },
             { text: "광고 없는 경험", included: true },
             { text: "커뮤니티 지원", included: true },
@@ -143,7 +143,7 @@ const plansData: PlanData[] = [
         icon: <ZapIcon />,
         popular: true,
         features: [
-            { text: "월 300회+30회 AI 생성", included: true },
+            { text: "월 300회+30회 AI 타이핑 생성", included: true },
             { text: "고급 AI 모델", included: true },
             { text: "팀 공유 기능", included: true },
             { text: "우선 지원 서비스", included: true },
@@ -161,7 +161,7 @@ const plansData: PlanData[] = [
         yearlyPrice: 69300,
         icon: <CrownIcon />,
         features: [
-            { text: "월 2000+200회 AI 생성", included: true },
+            { text: "월 2000+200회 AI 타이핑 생성", included: true },
             { text: "팀 협업 기능", included: true },
             { text: "API 액세스", included: true },
             { text: "전담 지원 서비스", included: true },

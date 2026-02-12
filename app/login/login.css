@@ -185,16 +185,23 @@ body {
     border: none;
     background: transparent;
     color: #d1d5db;
-    font-size: 0.8125rem;
-    font-weight: 600;
     cursor: pointer;
     padding: 0;
     margin-left: 0.25rem;
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .password-toggle-btn:hover {
     color: #ffffff;
+}
+
+.password-toggle-btn svg {
+    color: currentColor;
+    width: 18px;
+    height: 18px;
 }
 
 .login-btn {

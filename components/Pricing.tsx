@@ -45,7 +45,7 @@ const plans: PricingPlan[] = [
             yearly: "0",
         },
         features: [
-            "하루 5회 AI 생성",
+            "총 5회 AI 타이핑 생성",
             "기본 수식 자동화",
             "광고 없는 경험",
             "커뮤니티 지원",
@@ -63,7 +63,7 @@ const plans: PricingPlan[] = [
             yearly: "20,930",
         },
         features: [
-            "월 300회+30회 AI 생성",
+            "월 300회+30회 AI 타이핑 생성",
             "고급 AI 모델",
             "팀 공유 기능",
             "우선 지원 서비스",
@@ -82,7 +82,7 @@ const plans: PricingPlan[] = [
             yearly: "69,300",
         },
         features: [
-            "월 2000+200회 AI 생성",
+            "월 2000+200회 AI 타이핑 생성",
             "팀 협업 기능",
             "API 액세스",
             "전담 지원 서비스",

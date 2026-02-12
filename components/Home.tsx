@@ -267,7 +267,7 @@ export default function Home() {
                                 className="primary-button"
                                 onClick={() =>
                                     handleDownload(
-                                        "https://github.com/MisterKinn/formulite-landing/releases/download/v1.0.0/nova-ai-setup-windows.exe",
+                                        "https://storage.googleapis.com/physics2/NovaAI_Setup_1.0.0.exe",
                                     )
                                 }
                             >
