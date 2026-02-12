@@ -8,6 +8,17 @@ import {
     resolveEffectiveUsagePlan,
 } from "@/lib/aiUsage";
 
+function resolveUsageProxyBaseUrl(): string {
+    const base = (process.env.NOVA_USAGE_API_BASE_URL || "").trim();
+    return base.replace(/\/+$/, "");
+}
+
+function shouldProxyUsageRequest(baseUrl: string): boolean {
+    if (!baseUrl) return false;
+    const selfHosts = new Set(["http://localhost:3000", "http://127.0.0.1:3000"]);
+    return !selfHosts.has(baseUrl);
+}
+
 /**
  * Increment AI usage counter
  * POST /api/ai/increment-usage
@@ -22,6 +33,28 @@ export async function POST(request: NextRequest) {
                 { error: "userId is required" },
                 { status: 400 }
             );
+        }
+
+        const proxyBaseUrl = resolveUsageProxyBaseUrl();
+        if (shouldProxyUsageRequest(proxyBaseUrl)) {
+            const upstreamUrl = `${proxyBaseUrl}/api/ai/increment-usage`;
+            const upstream = await fetch(upstreamUrl, {
+                method: "POST",
+                cache: "no-store",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ userId }),
+            });
+            const body = await upstream.text();
+            return new NextResponse(body, {
+                status: upstream.status,
+                headers: {
+                    "Content-Type":
+                        upstream.headers.get("content-type") || "application/json",
+                    "Cache-Control": "no-store, no-cache, must-revalidate",
+                },
+            });
         }
 
         const admin = await getFirebaseAdmin();

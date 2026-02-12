@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import os
 import subprocess
 
 
@@ -25,6 +26,19 @@ class LatexConversionError(RuntimeError):
 NODE_CLI = Path(__file__).resolve().parents[1] / "node_eqn" / "hwp_eqn_cli.js"
 
 
+def _windows_hidden_subprocess_kwargs() -> dict[str, Any]:
+    """Return Windows-only subprocess flags that suppress console windows."""
+    if os.name != "nt":
+        return {}
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = 0  # SW_HIDE
+    return {
+        "startupinfo": startupinfo,
+        "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    }
+
+
 def latex_to_hwpeqn(latex: str, timeout: float = 10.0) -> str:
     text = (latex or "").strip()
     if not text:
@@ -41,6 +55,7 @@ def latex_to_hwpeqn(latex: str, timeout: float = 10.0) -> str:
             text=True,
             timeout=timeout,
             check=True,
+            **_windows_hidden_subprocess_kwargs(),
         )
         output = result.stdout.strip()
         return output or latex

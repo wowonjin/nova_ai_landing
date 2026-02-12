@@ -1860,6 +1860,7 @@ class NovaAILiteWindow(QWidget):
             self._header_plan.setText("")
             self._header_plan.setVisible(False)
             self._header_user_area.setVisible(True)
+        self._update_send_button_state()
 
     def _on_login_clicked(self) -> None:
         """로그인 버튼 클릭 - 브라우저로 OAuth 로그인"""
@@ -2107,6 +2108,20 @@ class NovaAILiteWindow(QWidget):
     def _start_ai_run(self, auto_type: bool) -> None:
         if not self.selected_images:
             QMessageBox.warning(self, "안내", "먼저 사진을 업로드하세요.")
+            return
+        remaining = self._get_remaining_send_quota()
+        if remaining <= 0:
+            QMessageBox.warning(self, "안내", "남은 횟수가 없어 이미지를 보낼 수 없습니다.")
+            return
+        if len(self.selected_images) > remaining:
+            exceeded = len(self.selected_images) - remaining
+            QMessageBox.warning(
+                self,
+                "안내",
+                f"남은 횟수는 {remaining}회입니다.\n"
+                f"현재 {len(self.selected_images)}장을 선택하여 {exceeded}장 초과되었습니다.\n"
+                "초과된 이미지는 제거한 뒤 다시 보내기 해주세요.",
+            )
             return
         if self._ai_worker and self._ai_worker.isRunning():
             return
@@ -2506,6 +2521,8 @@ class NovaAILiteWindow(QWidget):
                 "이미지를 넣으려면 먼저 로그인해야 이용 가능합니다.",
             )
             return
+        if next_images:
+            next_images = self._limit_images_by_remaining_quota(next_images)
 
         self.selected_images = next_images
         self._update_send_button_state()
@@ -2559,10 +2576,52 @@ class NovaAILiteWindow(QWidget):
         self.typing_status_label.setVisible(bool(text))
         self._update_send_button_state()
 
+    def _get_remaining_send_quota(self) -> int:
+        if not self.profile_uid:
+            return 0
+        tier = self.profile_plan or "Free"
+        limit = max(0, int(get_plan_limit(tier)))
+        usage = max(0, int(self._profile_usage or 0))
+        return max(0, limit - usage)
+
+    def _limit_images_by_remaining_quota(
+        self, image_paths: list[str], show_message: bool = True
+    ) -> list[str]:
+        if not image_paths:
+            return image_paths
+        remaining = self._get_remaining_send_quota()
+        if remaining <= 0:
+            if show_message:
+                QMessageBox.warning(
+                    self,
+                    "안내",
+                    "남은 횟수가 없어 이미지를 추가할 수 없습니다.",
+                )
+            return []
+        if len(image_paths) <= remaining:
+            return image_paths
+
+        exceeded = len(image_paths) - remaining
+        if show_message:
+            QMessageBox.information(
+                self,
+                "안내",
+                f"남은 횟수는 {remaining}회입니다.\n"
+                f"선택한 {len(image_paths)}장 중 {exceeded}장은 초과되어 추가되지 않았습니다.",
+            )
+        return image_paths[:remaining]
+
     def _update_send_button_state(self) -> None:
         has_images = bool(self.selected_images)
         status = self.typing_status_label.text().strip()
         if not has_images:
+            self.btn_ai_type.setEnabled(False)
+            return
+        remaining = self._get_remaining_send_quota()
+        if remaining <= 0:
+            self.btn_ai_type.setEnabled(False)
+            return
+        if len(self.selected_images) > remaining:
             self.btn_ai_type.setEnabled(False)
             return
         if status and status != "타이핑 완료":
