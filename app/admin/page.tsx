@@ -72,6 +72,9 @@ interface Payment {
     card?: { company: string; number: string };
 }
 
+const EDITABLE_PLANS = ["free", "plus", "pro"] as const;
+type EditablePlan = (typeof EDITABLE_PLANS)[number];
+
 export default function AdminPage() {
     const router = useRouter();
     const [authUser, setAuthUser] = useState<User | null>(null);
@@ -115,6 +118,12 @@ export default function AdminPage() {
         {},
     );
     const [updatingUsageUserId, setUpdatingUsageUserId] = useState<string | null>(
+        null,
+    );
+    const [planEditValues, setPlanEditValues] = useState<Record<string, EditablePlan>>(
+        {},
+    );
+    const [updatingPlanUserId, setUpdatingPlanUserId] = useState<string | null>(
         null,
     );
 
@@ -278,6 +287,74 @@ export default function AdminPage() {
             );
         } finally {
             setUpdatingUsageUserId(null);
+        }
+    };
+
+    // Handle plan update (usage limit/remaining changes together)
+    const handleUpdatePlan = async (user: UserData) => {
+        const selectedPlan =
+            planEditValues[user.uid] ||
+            (EDITABLE_PLANS.includes(user.subscription.plan as EditablePlan)
+                ? (user.subscription.plan as EditablePlan)
+                : "free");
+
+        setUpdatingPlanUserId(user.uid);
+        try {
+            const authorization = await getAdminAuthHeader();
+            if (!authorization) throw new Error("관리자 인증이 필요합니다.");
+
+            const response = await fetch(`/api/admin/users/${user.uid}`, {
+                method: "PATCH",
+                headers: {
+                    Authorization: authorization,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ plan: selectedPlan }),
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "플랜 수정 실패");
+            }
+
+            setUsers((prev) =>
+                prev.map((item) =>
+                    item.uid === user.uid
+                        ? {
+                              ...item,
+                              subscription: {
+                                  ...item.subscription,
+                                  ...data.subscription,
+                                  plan:
+                                      data.subscription?.plan || selectedPlan,
+                              },
+                              usage: {
+                                  ...item.usage,
+                                  ...data.usage,
+                              },
+                          }
+                        : item,
+                ),
+            );
+            setPlanEditValues((prev) => ({
+                ...prev,
+                [user.uid]: (data.subscription?.plan ||
+                    selectedPlan) as EditablePlan,
+            }));
+            setUsageEditValues((prev) => ({
+                ...prev,
+                [user.uid]: String(data.usage?.remaining ?? 0),
+            }));
+            alert("플랜이 수정되었고 사용량이 갱신되었습니다.");
+        } catch (error) {
+            console.error("Update plan error:", error);
+            alert(
+                error instanceof Error
+                    ? error.message
+                    : "플랜 수정에 실패했습니다.",
+            );
+        } finally {
+            setUpdatingPlanUserId(null);
         }
     };
 
@@ -869,6 +946,63 @@ export default function AdminPage() {
                                                 </td>
                                                 <td>
                                                     <div className="admin-action-group">
+                                                        <div className="admin-plan-edit">
+                                                            <select
+                                                                value={
+                                                                    planEditValues[
+                                                                        user.uid
+                                                                    ] ||
+                                                                    (EDITABLE_PLANS.includes(
+                                                                        user
+                                                                            .subscription
+                                                                            .plan as EditablePlan,
+                                                                    )
+                                                                        ? (user
+                                                                              .subscription
+                                                                              .plan as EditablePlan)
+                                                                        : "free")
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setPlanEditValues(
+                                                                        (prev) => ({
+                                                                            ...prev,
+                                                                            [user.uid]:
+                                                                                e
+                                                                                    .target
+                                                                                    .value as EditablePlan,
+                                                                        }),
+                                                                    )
+                                                                }
+                                                                className="admin-plan-select"
+                                                            >
+                                                                <option value="free">
+                                                                    Free
+                                                                </option>
+                                                                <option value="plus">
+                                                                    Plus
+                                                                </option>
+                                                                <option value="pro">
+                                                                    Pro
+                                                                </option>
+                                                            </select>
+                                                            <button
+                                                                onClick={() =>
+                                                                    handleUpdatePlan(
+                                                                        user,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    updatingPlanUserId ===
+                                                                    user.uid
+                                                                }
+                                                                className="admin-save-btn"
+                                                            >
+                                                                {updatingPlanUserId ===
+                                                                user.uid
+                                                                    ? "저장 중..."
+                                                                    : "플랜 저장"}
+                                                            </button>
+                                                        </div>
                                                         <div className="admin-usage-edit">
                                                             <input
                                                                 type="number"

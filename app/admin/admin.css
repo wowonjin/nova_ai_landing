@@ -518,6 +518,28 @@
     gap: 0.4rem;
 }
 
+.admin-plan-edit {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.admin-plan-select {
+    min-width: 92px;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #3f3f46;
+    border-radius: 8px;
+    background: #111827;
+    color: #ffffff;
+    font-size: 0.8rem;
+}
+
+.admin-plan-select:focus {
+    outline: none;
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+}
+
 .admin-usage-input {
     width: 84px;
     padding: 0.4rem 0.5rem;

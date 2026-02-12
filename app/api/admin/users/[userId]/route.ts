@@ -6,11 +6,20 @@ import { getTierLimit } from "@/lib/tierLimits";
 import { resolveEffectiveUsagePlan } from "@/lib/aiUsage";
 
 const db = admin.firestore();
+const ALLOWED_PLANS = ["free", "plus", "pro"] as const;
+type EditablePlan = (typeof ALLOWED_PLANS)[number];
+
+function isEditablePlan(value: unknown): value is EditablePlan {
+    return (
+        typeof value === "string" &&
+        ALLOWED_PLANS.includes(value.toLowerCase() as EditablePlan)
+    );
+}
 
 /**
  * PATCH /api/admin/users/[userId]
- * Updates user's remaining AI usage for current cycle/day.
- * Body: { remainingUsage: number }
+ * Updates user's plan and/or remaining AI usage for current cycle/day.
+ * Body: { remainingUsage?: number, plan?: "free" | "plus" | "pro" }
  */
 export async function PATCH(
     request: NextRequest,
@@ -34,42 +43,83 @@ export async function PATCH(
     }
 
     try {
-        const body = (await request.json()) as { remainingUsage?: unknown };
-        const remainingUsage = Number(body?.remainingUsage);
-
-        if (!Number.isFinite(remainingUsage) || remainingUsage < 0) {
+        const body = (await request.json()) as {
+            remainingUsage?: unknown;
+            plan?: unknown;
+        };
+        const hasRemainingUsage = body.remainingUsage !== undefined;
+        const hasPlan = body.plan !== undefined;
+        if (!hasRemainingUsage && !hasPlan) {
             return NextResponse.json(
-                { error: "remainingUsage must be a non-negative number" },
+                { error: "At least one of remainingUsage or plan is required" },
                 { status: 400 },
             );
+        }
+
+        let requestedPlan: EditablePlan | undefined = undefined;
+        if (hasPlan) {
+            if (!isEditablePlan(body.plan)) {
+                return NextResponse.json(
+                    { error: "plan must be one of: free, plus, pro" },
+                    { status: 400 },
+                );
+            }
+            requestedPlan = body.plan.toLowerCase() as EditablePlan;
         }
 
         const userRef = db.collection("users").doc(userId);
         const userDoc = await userRef.get();
         const userData = (userDoc.data() || {}) as Record<string, any>;
-        const plan = resolveEffectiveUsagePlan(userData);
-        const usageLimit = getTierLimit(plan);
+        const currentUsage = Math.max(0, Number(userData.aiCallUsage || 0));
+        const effectivePlan = resolveEffectiveUsagePlan(userData);
+        const nextPlan = requestedPlan || effectivePlan;
+        const usageLimit = getTierLimit(nextPlan);
 
-        if (remainingUsage > usageLimit) {
-            return NextResponse.json(
-                {
-                    error: `remainingUsage cannot exceed current plan limit (${usageLimit})`,
-                },
-                { status: 400 },
-            );
+        let nextUsage = Math.min(currentUsage, usageLimit);
+        if (hasRemainingUsage) {
+            const remainingUsage = Number(body.remainingUsage);
+            if (!Number.isFinite(remainingUsage) || remainingUsage < 0) {
+                return NextResponse.json(
+                    { error: "remainingUsage must be a non-negative number" },
+                    { status: 400 },
+                );
+            }
+            if (remainingUsage > usageLimit) {
+                return NextResponse.json(
+                    {
+                        error: `remainingUsage cannot exceed current plan limit (${usageLimit})`,
+                    },
+                    { status: 400 },
+                );
+            }
+            nextUsage = Math.max(0, usageLimit - Math.floor(remainingUsage));
         }
 
-        const nextUsage = Math.max(0, usageLimit - Math.floor(remainingUsage));
+        const nowIso = new Date().toISOString();
+        const updatePayload: Record<string, any> = {
+            aiCallUsage: nextUsage,
+            updatedAt: nowIso,
+        };
+        if (requestedPlan) {
+            updatePayload.plan = requestedPlan;
+            updatePayload.tier = requestedPlan;
+            updatePayload.subscription = {
+                ...(userData.subscription || {}),
+                plan: requestedPlan,
+            };
+        }
+
         await userRef.set(
-            {
-                aiCallUsage: nextUsage,
-                updatedAt: new Date().toISOString(),
-            },
+            updatePayload,
             { merge: true },
         );
 
         return NextResponse.json({
             success: true,
+            subscription: {
+                ...((userData.subscription || {}) as Record<string, any>),
+                plan: requestedPlan || userData.subscription?.plan || effectivePlan,
+            },
             usage: {
                 today: nextUsage,
                 limit: usageLimit,
