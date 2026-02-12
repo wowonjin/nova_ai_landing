@@ -111,6 +111,12 @@ export default function AdminPage() {
     const [deletingPaymentKey, setDeletingPaymentKey] = useState<string | null>(
         null,
     );
+    const [usageEditValues, setUsageEditValues] = useState<Record<string, string>>(
+        {},
+    );
+    const [updatingUsageUserId, setUpdatingUsageUserId] = useState<string | null>(
+        null,
+    );
 
     const getAdminAuthHeader = useCallback(async () => {
         if (authUser) {
@@ -207,6 +213,71 @@ export default function AdminPage() {
             );
         } finally {
             setDeletingUserId(null);
+        }
+    };
+
+    // Handle remaining usage update
+    const handleUpdateRemainingUsage = async (user: UserData) => {
+        const rawValue =
+            usageEditValues[user.uid] ?? String(user.usage?.remaining ?? 0);
+        const parsedValue = Number(rawValue);
+        const usageLimit = user.usage?.limit ?? 0;
+
+        if (!Number.isInteger(parsedValue) || parsedValue < 0) {
+            alert("남은 사용량은 0 이상의 정수여야 합니다.");
+            return;
+        }
+        if (parsedValue > usageLimit) {
+            alert(`남은 사용량은 현재 한도(${usageLimit})를 초과할 수 없습니다.`);
+            return;
+        }
+
+        setUpdatingUsageUserId(user.uid);
+        try {
+            const authorization = await getAdminAuthHeader();
+            if (!authorization) throw new Error("관리자 인증이 필요합니다.");
+
+            const response = await fetch(`/api/admin/users/${user.uid}`, {
+                method: "PATCH",
+                headers: {
+                    Authorization: authorization,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ remainingUsage: parsedValue }),
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "남은 사용량 수정 실패");
+            }
+
+            setUsers((prev) =>
+                prev.map((item) =>
+                    item.uid === user.uid
+                        ? {
+                              ...item,
+                              usage: {
+                                  ...item.usage,
+                                  ...data.usage,
+                              },
+                          }
+                        : item,
+                ),
+            );
+            setUsageEditValues((prev) => ({
+                ...prev,
+                [user.uid]: String(data.usage?.remaining ?? parsedValue),
+            }));
+            alert("남은 사용량이 수정되었습니다.");
+        } catch (error) {
+            console.error("Update remaining usage error:", error);
+            alert(
+                error instanceof Error
+                    ? error.message
+                    : "남은 사용량 수정에 실패했습니다.",
+            );
+        } finally {
+            setUpdatingUsageUserId(null);
         }
     };
 
@@ -797,24 +868,76 @@ export default function AdminPage() {
                                                     )}
                                                 </td>
                                                 <td>
-                                                    <button
-                                                        onClick={() =>
-                                                            handleDeleteUser(
-                                                                user.uid,
-                                                                user.email,
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            deletingUserId ===
+                                                    <div className="admin-action-group">
+                                                        <div className="admin-usage-edit">
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                max={
+                                                                    user.usage
+                                                                        ?.limit ?? 0
+                                                                }
+                                                                step={1}
+                                                                value={
+                                                                    usageEditValues[
+                                                                        user.uid
+                                                                    ] ??
+                                                                    String(
+                                                                        user.usage
+                                                                            ?.remaining ??
+                                                                            0,
+                                                                    )
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setUsageEditValues(
+                                                                        (prev) => ({
+                                                                            ...prev,
+                                                                            [user.uid]:
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                        }),
+                                                                    )
+                                                                }
+                                                                className="admin-usage-input"
+                                                            />
+                                                            <button
+                                                                onClick={() =>
+                                                                    handleUpdateRemainingUsage(
+                                                                        user,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    updatingUsageUserId ===
+                                                                    user.uid
+                                                                }
+                                                                className="admin-save-btn"
+                                                            >
+                                                                {updatingUsageUserId ===
+                                                                user.uid
+                                                                    ? "저장 중..."
+                                                                    : "저장"}
+                                                            </button>
+                                                        </div>
+                                                        <button
+                                                            onClick={() =>
+                                                                handleDeleteUser(
+                                                                    user.uid,
+                                                                    user.email,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                deletingUserId ===
+                                                                user.uid
+                                                            }
+                                                            className="admin-delete-btn"
+                                                        >
+                                                            {deletingUserId ===
                                                             user.uid
-                                                        }
-                                                        className="admin-delete-btn"
-                                                    >
-                                                        {deletingUserId ===
-                                                        user.uid
-                                                            ? "삭제 중..."
-                                                            : "삭제"}
-                                                    </button>
+                                                                ? "삭제 중..."
+                                                                : "삭제"}
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
