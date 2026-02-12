@@ -36,6 +36,15 @@ export function isFirebaseConfigured(): boolean {
     return missingRequiredKeys.length === 0;
 }
 
+export function getFirebaseClientConfigDiagnostics() {
+    return {
+        configured: isFirebaseConfigured(),
+        missingRequiredKeys: [...missingRequiredKeys],
+        projectId: firebaseConfig.projectId || null,
+        authDomain: firebaseConfig.authDomain || null,
+    };
+}
+
 /**
  * Returns the initialized Firebase App, or throws if required env vars are missing.
  *

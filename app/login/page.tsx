@@ -7,7 +7,10 @@ import { useAuth } from "../../context/AuthContext";
 import { Navbar } from "../../components/Navbar";
 import Sidebar from "../(home)/SidebarDynamic";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { getFirebaseAppOrNull } from "../../firebaseConfig";
+import {
+    getFirebaseAppOrNull,
+    getFirebaseClientConfigDiagnostics,
+} from "../../firebaseConfig";
 import {
     ADMIN_EMAIL,
     ADMIN_SESSION_STORAGE_KEY,
@@ -53,6 +56,14 @@ function LoginContent() {
     const [signupMode, setSignupMode] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    useEffect(() => {
+        const diagnostics = getFirebaseClientConfigDiagnostics();
+        if (diagnostics.configured) return;
+        setError(
+            `Firebase 설정이 누락되었습니다. Vercel 환경변수(NEXT_PUBLIC_FIREBASE_*)를 확인해주세요. 누락 키: ${diagnostics.missingRequiredKeys.join(", ")}`,
+        );
+    }, []);
 
     useEffect(() => {
         // Desktop login flow can request explicit account switching.
@@ -280,6 +291,17 @@ function LoginContent() {
                 )
             ) {
                 setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+            } else if (String(code).toLowerCase().includes("firebase_not_configured")) {
+                setError(
+                    "배포 환경의 Firebase 설정이 누락되었습니다. Vercel 프로젝트 환경변수(NEXT_PUBLIC_FIREBASE_*)를 설정한 뒤 재배포해주세요.",
+                );
+            } else if (
+                String(code).toLowerCase().includes("unauthorized-domain") ||
+                String(code).toLowerCase().includes("auth/operation-not-allowed")
+            ) {
+                setError(
+                    "현재 배포 도메인이 Firebase 인증에 허용되지 않았거나 인증 방식이 비활성화되어 있습니다. Firebase Console > Authentication 설정을 확인해주세요.",
+                );
             } else if (
                 String(code).toLowerCase().includes("too-many-requests")
             ) {
