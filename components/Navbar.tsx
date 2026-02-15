@@ -229,7 +229,13 @@ export function Navbar() {
         <nav className="navbar animate-fade-in">
             <div className="navbar-inner">
                 <a href="/" title="NOVA AI" className="nav-brand no-hover">
-                    <span className="brand-text">NOVA AI</span>
+                    <div className="brand-mark no-hover">
+                        <img
+                            src="/logogo.png"
+                            alt="NOVA AI"
+                            className="brand-mark-img"
+                        />
+                    </div>
                 </a>
 
                 <div className="nav-items">

@@ -22,7 +22,9 @@ export const metadata: Metadata = {
     description:
         "당신의 아이디어가 귀찮은 수식 입력으로 인해 끊기지 않도록, UNOVA가 한글 파일을 자동으로 편집하고 관리합니다.",
     icons: {
-        icon: "/logo33.png",
+        icon: "/pabicon789.png",
+        shortcut: "/pabicon789.png",
+        apple: "/pabicon789.png",
     },
     openGraph: {
         title: "NOVA AI - 한글 문서 자동화의 새로운 표준",
