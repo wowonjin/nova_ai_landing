@@ -31,7 +31,7 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 ; 출력 설정
 OutputDir=output
-OutputBaseFilename=NovaAI_Setup_{#MyAppVersion}
+OutputBaseFilename=NovaAI_Setup_{#MyAppVersion}_pabicon2
 ; 압축 설정
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -43,7 +43,7 @@ ShowLanguageDialog=auto
 ; LicenseFile=LICENSE.txt
 ; InfoBeforeFile=INSTALL_NOTE.txt
 ; 아이콘 / 설치 마법사 이미지
-SetupIconFile=nova_ai.ico
+SetupIconFile=pabicon789.ico
 WizardImageFile=wizard_image.png
 WizardSmallImageFile=wizard_small.png
 UninstallDisplayIcon={app}\{#MyAppExeName}
@@ -65,19 +65,46 @@ Source: "{#BuildDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs c
 ; 폰트/환경설정/아이콘 파일
 Source: "fonts\*"; DestDir: "{app}\fonts"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: ".env"; DestDir: "{app}"; Flags: ignoreversion
-Source: "nova_ai.ico"; DestDir: "{app}"; Flags: ignoreversion
-Source: "logo33.png"; DestDir: "{app}"; Flags: ignoreversion
+Source: "pabicon789.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "pabicon789.png"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\nova_ai.ico"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\pabicon789.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; IconFilename: "{app}\nova_ai.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; IconFilename: "{app}\pabicon789.ico"
 ; Quick Launch 바로가기 제거 (Windows 10+ 미지원)
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+var
+  DefaultWizardBitmapTop: Integer;
+
+procedure ApplyWizardImageLayout(CurPageID: Integer);
+begin
+  { Add right margin for the small top-right image. }
+  WizardForm.WizardSmallBitmapImage.Left :=
+    WizardForm.ClientWidth - WizardForm.WizardSmallBitmapImage.Width - ScaleX(18);
+
+  { Place the large wizard image near top only on the finished page. }
+  if CurPageID = wpFinished then
+    WizardForm.WizardBitmapImage.Top := WizardForm.InnerNotebook.Top + ScaleY(10)
+  else
+    WizardForm.WizardBitmapImage.Top := DefaultWizardBitmapTop;
+end;
+
+procedure InitializeWizard();
+begin
+  DefaultWizardBitmapTop := WizardForm.WizardBitmapImage.Top;
+  ApplyWizardImageLayout(wpWelcome);
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  ApplyWizardImageLayout(CurPageID);
+end;
+
 // 설치 후 .env 파일이 없으면 .env.example을 .env로 복사
 procedure CurStepChanged(CurStep: TSetupStep);
 var

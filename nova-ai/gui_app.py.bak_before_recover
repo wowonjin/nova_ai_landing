@@ -65,7 +65,7 @@ from backend.firebase_profile import (
 
 
 class LoginWorker(QThread):
-    """OAuth ????? ????????????"""
+    """OAuth ë¡ê·¸?¸ì ë°±ê·¸?¼ì´?ì??ì²ë¦¬"""
     finished = Signal(bool)  # True if login successful
     
     def run(self) -> None:
@@ -172,17 +172,17 @@ class AIWorker(QThread):
                 uid = str(user.get("uid") or "")
                 tier = str(user.get("plan") or user.get("tier") or "free")
 
-                # ????? 1??? ??? ????1??? ???.
+                # ?´ë?ì§ 1?¥ë¹ ?ë ì²´í¬??1?ë§ ?í.
                 if uid and not check_usage_limit(uid, tier):
                     limit = get_plan_limit(tier)
                     raise AIClientError(
-                        f"\uC0AC\uC6A9 \uD55C\uB3C4\uC5D0 \uB3C4\uB2EC\uD588\uC2B5\uB2C8\uB2E4 ({limit}/{limit}).\n"
-                        f"\uD604\uC7AC \uD50C\uB79C: {tier}\n"
-                        "nova-ai.work\uC5D0\uC11C \uD50C\uB79C\uC744 \uC5C5\uADF8\uB808\uC774\uB4DC\uD574\uC8FC\uC138\uC694."
+                        f"?? ??? ??????! ({limit}/{limit})\n"
+                        f"?? ??: {tier}\n"
+                        "nova-ai.work?? ??? ???????? ?? ?? ??? ? ?? ??????."
                     )
 
                 # 1 image : 1 AIClient (1-to-1 mapping, safe for concurrency)
-                # ???? ??(????????)????? ??????????? ??? ???? ?????.
+                # ?´ë? ë¶ê¸°(ë°???? ì?)ë¡??¬ë¬ ë²??¸ì¶?ë?¼ë ?ë ì°¨ê°? ë¹í?±í.
                 try:
                     client = AIClient(check_usage=False)
                 except Exception as e:
@@ -295,7 +295,7 @@ class AIWorker(QThread):
                             "Type ONLY the content OUTSIDE/BEFORE the box container. "
                             "This includes the problem statement and equation. "
                             "Do NOT include ?? ?? ?? conditions - those go INSIDE the box. "
-                            "Do NOT include the answer choices (????????."
+                            "Do NOT include the answer choices (? â¡?¢â£??."
                         ),
                         ocr_text=outside_ocr or ocr_text_full,
                     )
@@ -307,20 +307,20 @@ class AIWorker(QThread):
                         image_path,  # Use full image, not cropped inside
                         description=(
                             "Type ONLY the ?? ?? ?? (or ?? ?? ?? ?? conditions that should go INSIDE the box. "
-                            "These are the numbered conditions like '?? k=0???...' or '?? k=3???...' "
+                            "These are the numbered conditions like '?? k=0?´ë©´...' or '?? k=3?´ë©´...' "
                             "Do NOT include the problem text before the box. "
-                            "Do NOT include answer choices (????????."
+                            "Do NOT include answer choices (? â¡?¢â£??."
                         ),
                         ocr_text=inside_ocr or ocr_text_full,
                     )
                     _log(f"[{idx}] Inside AI response length: {len(inside_script_raw) if inside_script_raw else 0}")
                     
                     _log(f"[{idx}] Calling AI for CHOICES content...")
-                    # For choices (????????, use the FULL image
+                    # For choices (? â¡?¢â£??, use the FULL image
                     choices_script_raw = client.generate_script_for_image(
                         image_path,
                         description=(
-                            "Type ONLY the answer choices (????????or ???? ???? ?? ???? ?? ???? ?? ???? ?? ??. "
+                            "Type ONLY the answer choices (? â¡?¢â£??or ???? ???? ?? ???? ?? ???? ?? ???? ?? ??. "
                             "These are the multiple choice options at the bottom of the problem. "
                             "Do NOT include the problem text. "
                             "Do NOT include ?? ?? ?? conditions."
@@ -341,7 +341,7 @@ class AIWorker(QThread):
                     # 1. Insert box template
                     # 2. @@@ = placeholder for content BEFORE the box (problem text)
                     # 3. ### = placeholder for content INSIDE the box (?? ?? ?? conditions)
-                    # 4. &&& = placeholder for content AFTER the box (answer choices ????????
+                    # 4. &&& = placeholder for content AFTER the box (answer choices ? â¡?¢â£??
                     combined = "\n".join(
                         [
                             f"insert_template('{det.template}')",
@@ -401,7 +401,7 @@ class AIWorker(QThread):
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
                 future_to_idx: dict[concurrent.futures.Future[str], int] = {}
                 for idx, image_path in enumerate(self._image_paths):
-                    self.progress.emit(idx, "\uC0DD\uC131\uC911...")
+                    self.progress.emit(idx, "생성중...")
                     future_to_idx[ex.submit(_job, idx, image_path)] = idx
 
                 for fut in concurrent.futures.as_completed(future_to_idx):
@@ -410,21 +410,21 @@ class AIWorker(QThread):
                         text = fut.result() or ""
                         results[idx] = text
                         if text.strip():
-                            self.progress.emit(idx, "\uCF54\uB4DC \uC0DD\uC131 \uC644\uB8CC")
+                            self.progress.emit(idx, "ì½ë ?ì± ?ë£")
                         else:
-                            self.progress.emit(idx, "\uC624\uB958(\uBE48 \uACB0\uACFC)")
+                            self.progress.emit(idx, "?¤ë¥(ë¹?ê²°ê³¼)")
                         # Notify UI for incremental typing / preview.
                         self.item_finished.emit(idx, text)
                     except Exception as exc:
                         results[idx] = ""
-                        self.progress.emit(idx, f"\uC624\uB958: {exc}")
+                        self.progress.emit(idx, f"?¤ë¥: {exc}")
                         self.item_finished.emit(idx, "")
             self.finished.emit(results)
         except Exception as exc:
             self.error.emit(str(exc))
 
 
-# ???? Material Icons helper ????????????????????????????????????????????????????????
+# ?? Material Icons helper ????????????????????????????
 _MI_MENU = "\ue5d2"
 _MI_PERSON = "\ue7fd"
 _MI_BAR_CHART = "\ue26b"
@@ -479,7 +479,7 @@ class SidebarOverlay(QWidget):
 class CodeViewDialog(QDialog):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("\uCF54\uB4DC \uBCF4\uAE30")
+        self.setWindowTitle("ì½ë ë³´ê¸°")
         self.setModal(True)
         self.resize(520, 420)
         self.setStyleSheet("QDialog { background-color: #ffffff; }")
@@ -503,7 +503,7 @@ class CodeViewDialog(QDialog):
 
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
-        close_btn = QPushButton("\uB2EB\uAE30")
+        close_btn = QPushButton("?«ê¸°")
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setStyleSheet(
             "QPushButton { background-color: #f3f4f6; color: #333;"
@@ -525,7 +525,7 @@ class LogoutDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("\uB85C\uADF8\uC544\uC6C3")
+        self.setWindowTitle("ë¡ê·¸?ì")
         self.setFixedSize(360, 220)
         self.setWindowFlags(
             Qt.WindowType.Dialog
@@ -533,7 +533,7 @@ class LogoutDialog(QDialog):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        # ???? outer card ????
+        # ?? outer card ??
         card = QFrame(self)
         card.setGeometry(0, 0, 360, 220)
         card.setStyleSheet(
@@ -556,7 +556,7 @@ class LogoutDialog(QDialog):
         lay.addSpacing(12)
 
         # title
-        title = QLabel("\uB85C\uADF8\uC544\uC6C3 \uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?")
+        title = QLabel("ë¡ê·¸?ì ?ìê² ìµ?ê¹?")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet(
             "font-size: 16px; font-weight: 700; color: #1a1a2e; background: transparent;"
@@ -566,7 +566,7 @@ class LogoutDialog(QDialog):
         lay.addSpacing(6)
 
         # subtitle
-        sub = QLabel("\uD604\uC7AC \uACC4\uC815\uC5D0\uC11C \uB85C\uADF8\uC544\uC6C3\uB429\uB2C8\uB2E4.")
+        sub = QLabel("ê³ì ?ì ë¡ê·¸?ì?©ë??")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sub.setStyleSheet(
             "font-size: 12px; color: #9ca3af; background: transparent;"
@@ -579,7 +579,7 @@ class LogoutDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.setSpacing(12)
 
-        cancel_btn = QPushButton("\uCDE8\uC18C")
+        cancel_btn = QPushButton("ì·¨ì")
         cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         cancel_btn.setFixedHeight(40)
         cancel_btn.setStyleSheet(
@@ -590,7 +590,7 @@ class LogoutDialog(QDialog):
         )
         cancel_btn.clicked.connect(self.reject)
 
-        confirm_btn = QPushButton("\uB85C\uADF8\uC544\uC6C3")
+        confirm_btn = QPushButton("ë¡ê·¸?ì")
         confirm_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         confirm_btn.setFixedHeight(40)
         confirm_btn.setStyleSheet(
@@ -634,7 +634,7 @@ class LoginResultDialog(QDialog):
 
     def __init__(self, parent=None, *, success: bool = True, user_name: str = ""):
         super().__init__(parent)
-        self.setWindowTitle("\uB85C\uADF8\uC778 \uC644\uB8CC" if success else "\uB85C\uADF8\uC778 \uC2E4\uD328")
+        self.setWindowTitle("ë¡ê·¸???±ê³µ" if success else "ë¡ê·¸???¤í¨")
         self.setFixedSize(360, 240)
         self.setWindowFlags(
             Qt.WindowType.Dialog
@@ -679,9 +679,9 @@ class LoginResultDialog(QDialog):
 
         # title
         if success:
-            title_text = "\uB85C\uADF8\uC778 \uC131\uACF5!"
+            title_text = "ë¡ê·¸???±ê³µ!"
         else:
-            title_text = "\uB85C\uADF8\uC778 \uC2E4\uD328"
+            title_text = "ë¡ê·¸???¤í¨"
         title = QLabel(title_text)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet(
@@ -693,9 +693,9 @@ class LoginResultDialog(QDialog):
 
         # subtitle
         if success:
-            sub_text = f"\uD658\uC601\uD569\uB2C8\uB2E4, {user_name}\uB2D8!"
+            sub_text = f"?ì?©ë?? {user_name}!"
         else:
-            sub_text = "\uB85C\uADF8\uC778\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694."
+            sub_text = "ë¡ê·¸?¸ì´ ì·¨ì?ìê±°ë ?¤í¨?ìµ?ë¤."
         sub = QLabel(sub_text)
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sub.setWordWrap(True)
@@ -710,7 +710,7 @@ class LoginResultDialog(QDialog):
         btn_color = "#10b981" if success else "#ef4444"
         btn_hover = "#059669" if success else "#dc2626"
         btn_pressed = "#047857" if success else "#b91c1c"
-        ok_btn = QPushButton("\uD655\uC778")
+        ok_btn = QPushButton("?ì¸")
         ok_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         ok_btn.setFixedHeight(40)
         ok_btn.setStyleSheet(
@@ -797,7 +797,7 @@ class ProfileDialog(_FramelessCardDialog):
     def __init__(self, parent=None, *, name: str = "", email: str = "",
                  tier: str = "Free", uid: str = ""):
         super().__init__(parent, 380, 340)
-        self.setWindowTitle("\uD504\uB85C\uD544 \uC815\uBCF4")
+        self.setWindowTitle("?ì ?ë³´")
         card = self._make_card()
         lay = QVBoxLayout(card)
         lay.setContentsMargins(32, 28, 32, 24)
@@ -823,18 +823,18 @@ class ProfileDialog(_FramelessCardDialog):
         lay.addLayout(a_row)
         lay.addSpacing(14)
 
-        # name
-        n_lbl = QLabel(name or "\uC0AC\uC6A9\uC790")
+        n_lbl = QLabel(name or "User")
+        n_lbl = QLabel(name or "User")
         n_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         n_lbl.setStyleSheet("font-size: 17px; font-weight: 700; color: #1a1a2e; background: transparent;")
         lay.addWidget(n_lbl)
         lay.addSpacing(4)
 
         # tier badge
-        _tier_map = {"Free": "\uBB34\uB8CC", "free": "\uBB34\uB8CC", "Standard": "Standard",
+        _tier_map = {"Free": "ë¬´ë£", "free": "ë¬´ë£", "Standard": "Standard",
                      "Plus": "\u25c7 PLUS",
                      "Pro": "Ultra", "pro": "Ultra", "ultra": "Ultra"}
-        badge = QLabel(_tier_map.get(tier, tier) + " \uD50C\uB79C")
+        badge = QLabel(_tier_map.get(tier, tier) + " ?ë")
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         badge.setStyleSheet(
             f"font-size: 11px; font-weight: 600; color: {accent};"
@@ -855,7 +855,7 @@ class ProfileDialog(_FramelessCardDialog):
         )
         sep_style = "background-color: #f3f4f6; border: none;"
 
-        for label_text, value_text in [("Email", email or "-"), ("UID", uid or "-")]:
+        for label_text, value_text in [("Email", email or "-"), ("UID", uid or "-")]: 
             row = QHBoxLayout()
             row.setContentsMargins(0, 0, 0, 0)
             lbl = QLabel(label_text)
@@ -877,7 +877,7 @@ class ProfileDialog(_FramelessCardDialog):
         lay.addStretch()
 
         # close button
-        close_btn = QPushButton("\uB2EB\uAE30")
+        close_btn = QPushButton("?«ê¸°")
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setFixedHeight(40)
         close_btn.setStyleSheet(
@@ -897,13 +897,13 @@ class UsageDialog(_FramelessCardDialog):
     def __init__(self, parent=None, *, tier: str = "Free",
                  usage: int = 0, limit: int = 5):
         super().__init__(parent, 380, 340)
-        self.setWindowTitle("\uC0AC\uC6A9\uB7C9 \uC815\uBCF4")
+        self.setWindowTitle("?¬ì© ?´ì­")
         card = self._make_card()
         lay = QVBoxLayout(card)
         lay.setContentsMargins(32, 16, 32, 24)
         lay.setSpacing(0)
 
-        # ??? ?? (?????
+        # ?«ê¸° ë²í¼ (?°ì??
         close_row = QHBoxLayout()
         close_row.setContentsMargins(0, 0, 0, 0)
         close_row.addStretch()
@@ -941,17 +941,17 @@ class UsageDialog(_FramelessCardDialog):
         lay.addSpacing(10)
 
         # title
-        title = QLabel("\uC0AC\uC6A9\uB7C9 \uD604\uD669")
+        title = QLabel("User")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("font-size: 17px; font-weight: 700; color: #1a1a2e; background: transparent;")
         lay.addWidget(title)
         lay.addSpacing(4)
 
         # tier badge
-        _tier_map = {"Free": "\uBB34\uB8CC", "free": "\uBB34\uB8CC", "Standard": "Standard",
+        _tier_map = {"Free": "ë¬´ë£", "free": "ë¬´ë£", "Standard": "Standard",
                      "Plus": "\u25c7 PLUS",
                      "Pro": "Ultra", "pro": "Ultra", "ultra": "Ultra"}
-        badge = QLabel(_tier_map.get(tier, tier) + " \uD50C\uB79C")
+        badge = QLabel(_tier_map.get(tier, tier) + " ?ë")
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         badge.setStyleSheet(
             f"font-size: 10px; font-weight: 600; color: {accent};"
@@ -987,17 +987,19 @@ class UsageDialog(_FramelessCardDialog):
         lay.addSpacing(6)
 
         # remaining text
-        rem_text = f"\uB0A8\uC740 \uD69F\uC218: {remaining}" if remaining > 0 else "\uC0AC\uC6A9 \uD55C\uB3C4\uC5D0 \uB3C4\uB2EC\uD588\uC2B5\uB2C8\uB2E4"
+        rem_text = f"Remaining uses: {remaining}" if remaining > 0 else "Usage limit reached"
         rem = QLabel(rem_text)
         rem.setAlignment(Qt.AlignmentFlag.AlignCenter)
         rem.setStyleSheet(
             f"font-size: 12px; color: {'#ef4444' if remaining <= 0 else '#9ca3af'}; background: transparent;"
         )
         lay.addWidget(rem)
-        # ??? ??? ???????????? ???
+        # ?ë ?ë¬ ???
+        # usage guide text
         if remaining <= 0:
             lay.addSpacing(20)
-            btn = QPushButton("\uD50C\uB79C \uC5C5\uADF8\uB808\uC774\uB4DC")
+            btn = QPushButton("?ë ?
+ê·¸?ì´??)
             btn.setStyleSheet(
                 "QPushButton { background-color: #f59e0b; color: #ffffff; border: none;"
                 "  border-radius: 10px; font-size: 13px; font-weight: 600; padding: 0 28px; }"
@@ -1017,31 +1019,32 @@ class UsageDialog(_FramelessCardDialog):
 
 
 class DownloadFormDialog(_FramelessCardDialog):
-    """?? ?? ???? ?????."""
+    """?ì ?¤ì´ë¡ë ?ì
+ ?¤ì´?¼ë¡ê·?"""
 
     _FORMS = [
-        ("\uC218\uB2A5 \uAD6D\uC5B4 \uC591\uC2DD \uB2E4\uC6B4\uB85C\uB4DC",
+        ("?ë¥ êµ?´ ?ì ?¤ì´ë¡ë",
          "https://storage.googleapis.com/physics2/%EC%96%91%EC%8B%9D/%EC%88%98%EB%8A%A5%20%EA%B5%AD%EC%96%B4%20%EC%96%91%EC%8B%9D%20%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C.hwp"),
-        ("\uC218\uB2A5 \uC601\uC5B4 \uC591\uC2DD \uB2E4\uC6B4\uB85C\uB4DC",
+        ("?ë¥ ?ì´ ?ì ?¤ì´ë¡ë",
          "https://storage.googleapis.com/physics2/%EC%96%91%EC%8B%9D/%EC%88%98%EB%8A%A5%20%EC%98%81%EC%96%B4%20%EC%96%91%EC%8B%9D%20%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C.hwp"),
-        ("\uC218\uB2A5 \uC218\uD559 \uC591\uC2DD \uB2E4\uC6B4\uB85C\uB4DC",
+        ("?ë¥ ?í ?ì ?¤ì´ë¡ë",
          "https://storage.googleapis.com/physics2/%EC%96%91%EC%8B%9D/%EC%88%98%EB%8A%A5%20%EC%88%98%ED%95%99%20%EC%96%91%EC%8B%9D%20%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C.hwp"),
-        ("\uC218\uB2A5 \uACFC\uD0D0 \uC591\uC2DD \uB2E4\uC6B4\uB85C\uB4DC",
+        ("?ë¥ ê³¼í ?ì ?¤ì´ë¡ë",
          "https://storage.googleapis.com/physics2/%EC%96%91%EC%8B%9D/%EC%88%98%EB%8A%A5%20%EA%B3%BC%ED%83%90%20%EC%96%91%EC%8B%9D%20%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C.hwp"),
-        ("\uC218\uB2A5 \uC0AC\uD0D0 \uC591\uC2DD \uB2E4\uC6B4\uB85C\uB4DC",
+        ("?ë¥ ?¬í ?ì ?¤ì´ë¡ë",
          "https://storage.googleapis.com/physics2/%EC%96%91%EC%8B%9D/%EC%88%98%EB%8A%A5%20%EC%82%AC%ED%9A%8C%20%EC%96%91%EC%8B%9D%20%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C.hwp"),
     ]
     _EXAM_BANK_URL = "https://novabook-six.vercel.app/exam-papers"
 
     def __init__(self, parent=None):
         super().__init__(parent, 380, 440)
-        self.setWindowTitle("\uC591\uC2DD \uB2E4\uC6B4\uB85C\uB4DC")
+        self.setWindowTitle("?ì ?¤ì´ë¡ë")
         card = self._make_card()
         lay = QVBoxLayout(card)
         lay.setContentsMargins(32, 16, 32, 24)
         lay.setSpacing(0)
 
-        # ??? ?? (?????
+        # ?«ê¸° ë²í¼ (?°ì??
         close_row = QHBoxLayout()
         close_row.setContentsMargins(0, 0, 0, 0)
         close_row.addStretch()
@@ -1068,7 +1071,7 @@ class DownloadFormDialog(_FramelessCardDialog):
         lay.addWidget(icon_label)
         lay.addSpacing(10)
 
-        title = QLabel("\uC591\uC2DD \uB2E4\uC6B4\uB85C\uB4DC")
+        title = QLabel("?ì ?¤ì´ë¡ë")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet(
             "font-size: 17px; font-weight: 700; color: #1a1a2e; background: transparent;"
@@ -1076,7 +1079,7 @@ class DownloadFormDialog(_FramelessCardDialog):
         lay.addWidget(title)
         lay.addSpacing(6)
 
-        subtitle = QLabel("\uCD5C\uC2E0 \uC218\uB2A5 HWP \uC591\uC2DD\uC744 \uB0B4\uB824\uBC1B\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4.")
+        subtitle = QLabel("?ë¥ ê³¼ëª©ë³?HWP ?ì???¤ì´ë¡ë?ì¸??)
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setStyleSheet(
             "font-size: 11px; color: #9ca3af; background: transparent;"
@@ -1085,9 +1088,8 @@ class DownloadFormDialog(_FramelessCardDialog):
         lay.addSpacing(18)
 
         for label_text, url in self._FORMS:
-            btn = QPushButton(label_text)
-            btn.setIcon(_material_icon(_MI_DOWNLOAD, 16, QColor("#4f46e5")))
-            btn.setIconSize(QSize(16, 16))
+            btn = QPushButton(f"  {_MI_DOWNLOAD}  {label_text}")
+            btn.setFont(self._mixed_font())
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setFixedHeight(36)
             btn.setStyleSheet(
@@ -1107,7 +1109,8 @@ class DownloadFormDialog(_FramelessCardDialog):
         lay.addWidget(sep)
         lay.addSpacing(10)
 
-        bank_btn = QPushButton("\uAE30\uCD9C\uBB38\uC81C \uBCF4\uB7EC\uAC00\uAE30")
+        bank_btn = QPushButton("  ê¸°ì¶ë±
+í¬ ?´ë?ê¸°")
         bank_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         bank_btn.setFixedHeight(40)
         bank_btn.setStyleSheet(
@@ -1151,13 +1154,13 @@ class NeedLoginDialog(_FramelessCardDialog):
         lay.addWidget(icon_label)
         lay.addSpacing(10)
 
-        msg = QLabel("\uB85C\uADF8\uC778 \uD6C4 \uC774\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4")
+        msg = QLabel("ë¡ê·¸?¸ì´ ?ì?©ë??)
         msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
         msg.setStyleSheet("font-size: 15px; font-weight: 600; color: #1a1a2e; background: transparent;")
         lay.addWidget(msg)
         lay.addSpacing(22)
 
-        btn = QPushButton("\uD655\uC778")
+        btn = QPushButton("?ì¸")
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setFixedHeight(38)
         btn.setStyleSheet(
@@ -1189,7 +1192,7 @@ class SidebarWidget(QFrame):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
 
-        # ???? User info section ??????????????????????????????????????????????????????????
+        # ?? User info section ?????????????????????????????
         user_section = QWidget()
         user_section.setObjectName("sidebarUserSection")
         user_section.setStyleSheet(
@@ -1201,12 +1204,12 @@ class SidebarWidget(QFrame):
         ul.setContentsMargins(24, 32, 24, 24)
         ul.setSpacing(4)
 
-        self._name = QLabel("\uAC8C\uC2A4\uD2B8")
+        self._name = QLabel("?¬ì©??)
         self._name.setStyleSheet(
             "font-size: 15px; font-weight: 700; color: #1a1a2e; background: transparent;"
         )
 
-        self._plan_badge = QLabel("\uBB34\uB8CC")
+        self._plan_badge = QLabel("Free")
         self._plan_badge.setFixedHeight(22)
         self._plan_badge.setStyleSheet(
             "font-size: 10px; font-weight: 600; color: #6366f1;"
@@ -1250,10 +1253,10 @@ class SidebarWidget(QFrame):
         ul.addWidget(self._usage_label)
         lay.addWidget(user_section)
 
-        # ???? Menu section padding ????????????????????????????????????????????????????
+        # ?? Menu section padding ??????????????????????????
         lay.addSpacing(8)
 
-        # ???? Menu items ????????????????????????????????????????????????????????????????????????
+        # ?? Menu items ????????????????????????????????????
         _ms = (
             "QPushButton { text-align: left; padding: 11px 24px; border: none;"
             "  background-color: transparent; color: #444; font-size: 13px;"
@@ -1269,11 +1272,12 @@ class SidebarWidget(QFrame):
             "inquiry": _MI_CHAT,
         }
         for mid, mlabel in [
-            ("profile", "\uD504\uB85C\uD544 \uC815\uBCF4"),
-            ("usage", "\uC0AC\uC6A9\uB7C9 \uC815\uBCF4"),
-            ("upgrade", "\uD50C\uB79C \uC5C5\uADF8\uB808\uC774\uB4DC"),
-            ("homepage", "\uD648\uD398\uC774\uC9C0"),
-            ("inquiry", "\uBB38\uC758/\uACE0\uAC1D\uC13C\uD130"),
+            ("profile", "?ì ?ë³´"),
+            ("usage", "?¬ì© ?´ì­"),
+            ("upgrade", "?ë ?
+ê·¸?ì´??),
+            ("homepage", "?í?´ì?"),
+            ("inquiry", "?¤ë¥/ë¬¸ì?¬í­"),
         ]:
             btn = QPushButton(mlabel)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1287,15 +1291,15 @@ class SidebarWidget(QFrame):
 
         lay.addStretch(1)
 
-        # ???? Separator ??????????????????????????????????????????????????????????????????????????
+        # ?? Separator ?????????????????????????????????????
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.HLine)
         sep2.setFixedHeight(1)
         sep2.setStyleSheet("background-color: #f0f0f0; border: none;")
         lay.addWidget(sep2)
 
-        # ???? Login / Logout ????????????????????????????????????????????????????????????????
-        self._login_btn = QPushButton("\uB85C\uADF8\uC778")
+        # ?? Login / Logout ????????????????????????????????
+        self._login_btn = QPushButton("ë¡ê·¸??)
         self._login_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._login_btn.setIcon(_material_icon(_MI_LOGIN, color=QColor("#6366f1")))
         self._login_btn.setIconSize(QSize(20, 20))
@@ -1307,7 +1311,7 @@ class SidebarWidget(QFrame):
         )
         self._login_btn.clicked.connect(self.login_clicked.emit)
 
-        self._logout_btn = QPushButton("\uB85C\uADF8\uC544\uC6C3")
+        self._logout_btn = QPushButton("ë¡ê·¸?ì")
         self._logout_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._logout_btn.setIcon(_material_icon(_MI_LOGOUT, color=QColor("#ef4444")))
         self._logout_btn.setIconSize(QSize(20, 20))
@@ -1328,7 +1332,7 @@ class SidebarWidget(QFrame):
 
         self.hide()
 
-    # ???? Public helpers ????????????????????????????????????????????????????????????????
+    # ?? Public helpers ????????????????????????????????
     def update_user_info(
         self,
         uid: str | None,
@@ -1340,7 +1344,7 @@ class SidebarWidget(QFrame):
         avatar_url: str | None = None,
     ) -> None:
         _tier_map = {
-            "Free": "\uBB34\uB8CC", "free": "\uBB34\uB8CC",
+            "Free": "ë¬´ë£", "free": "ë¬´ë£",
             "Standard": "PLUS", "standard": "PLUS",
             "Plus": "PLUS", "plus": "PLUS",
             "Pro": "Ultra", "pro": "Ultra", "ultra": "Ultra",
@@ -1353,10 +1357,10 @@ class SidebarWidget(QFrame):
         }
         if uid:
             accent = _tier_colors.get(tier, "#6366f1")
-            self._name.setText(name or "\uC0AC\uC6A9\uC790")
+            self._name.setText(name or "?¬ì©??)
             self._email.setText(email or "")
             self._email.setVisible(bool(email))
-            self._plan_badge.setText(f"{_tier_map.get(tier, tier)} \uD50C\uB79C")
+            self._plan_badge.setText(f"{_tier_map.get(tier, tier)} ?ë")
             self._plan_badge.setStyleSheet(
                 f"font-size: 10px; font-weight: 600; color: {accent};"
                 f"background-color: rgba({int(accent[1:3],16)},{int(accent[3:5],16)},{int(accent[5:7],16)},0.12);"
@@ -1384,13 +1388,13 @@ class SidebarWidget(QFrame):
             """)
             self._usage_bar.setVisible(True)
             self._usage_label.setText(
-                f"{usage}/{limit} \uC0AC\uC6A9" if rem > 0 else "\uD55C\uB3C4 \uB3C4\uB2EC"
+                f"{usage}/{limit} ?¬ì©" if rem > 0 else "?ë ì´ê³¼"
             )
             self._usage_label.setVisible(True)
             self._login_btn.setVisible(False)
             self._logout_btn.setVisible(True)
         else:
-            self._name.setText("\uB85C\uADF8\uC778 \uD574\uC8FC\uC138\uC694")
+            self._name.setText("ë¡ê·¸?¸ì´ ?ì?©ë??)
             self._email.setVisible(False)
             self._plan_badge.setVisible(False)
             self._usage_bar.setVisible(False)
@@ -1402,16 +1406,16 @@ class SidebarWidget(QFrame):
 class NovaAILiteWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("Nova AI - \uC218\uB2A5 \uD615\uC2DD \uD0C0\uC774\uD551 AI")
+        self.setWindowTitle("Nova AI - ?ê? ?ì ??´í AI")
         self.setMinimumSize(360, 480)
         self.setAcceptDrops(True)
 
-        # ??????????
+        # ???ì´ì½??¤ì 
         _app_dir = Path(__file__).resolve().parent
         _icon_candidates = [
             _app_dir / "logo33.png",
             _app_dir / "nova_ai.ico",
-            # PyInstaller ?? ???? ??
+            # PyInstaller ë²ë¤ ?´ë? ê²½ë¡
             Path(getattr(sys, '_MEIPASS', '')) / "logo33.png" if getattr(sys, '_MEIPASS', None) else None,
             Path(getattr(sys, '_MEIPASS', '')) / "nova_ai.ico" if getattr(sys, '_MEIPASS', None) else None,
         ]
@@ -1422,8 +1426,8 @@ class NovaAILiteWindow(QWidget):
 
         # Profile state (populated from get_stored_user() and Firebase)
         self.profile_uid: str | None = None
-        self.profile_display_name: str = "\uC0AC\uC6A9\uC790"
-        self.profile_plan: str = "\uBB34\uB8CC"
+        self.profile_display_name: str = "?¬ì©??
+        self.profile_plan: str = "Free"
         self.profile_avatar_url: str | None = None
         self._login_worker: LoginWorker | None = None
 
@@ -1443,7 +1447,7 @@ class NovaAILiteWindow(QWidget):
         self._auto_type_pending_idx: int | None = None
         self._skipped_indexes: set[int] = set()
         self._typing_worker: "TypingWorker | None" = None
-        # ???? ???????? ??(pill) ????
+        # ?? ê°ì????ì¼ ì¹?(pill) ??
         self._filename_chip = QFrame()
         self._filename_chip.setObjectName("filenameChip")
         self._filename_chip.setFixedHeight(32)
@@ -1460,7 +1464,7 @@ class NovaAILiteWindow(QWidget):
         self._filename_icon.setFixedSize(18, 18)
         self._filename_icon.setStyleSheet("background: transparent;")
         _chip_lay.addWidget(self._filename_icon)
-        self.filename_label = QLabel("\uAC10\uC9C0 \uD30C\uC77C \uC5C6\uC74C")
+        self.filename_label = QLabel("ê°ì????ì¼ ?ì")
         self.filename_label.setStyleSheet(
             "color: #3B82F6; font-size: 12px; font-weight: 700; background: transparent;"
         )
@@ -1470,7 +1474,7 @@ class NovaAILiteWindow(QWidget):
         _chip_lay.addWidget(self.filename_label)
         self._filename_chip.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
 
-        # ???? ??? ???? ??? ????
+        # ?? ?ì¬ ?ì´ì§ ë±ì? ??
         self._page_badge = QFrame()
         self._page_badge.setObjectName("pageBadge")
         self._page_badge.setFixedHeight(32)
@@ -1492,7 +1496,7 @@ class NovaAILiteWindow(QWidget):
         self.typing_status_label = QLabel("")
         self.typing_status_label.setStyleSheet("color: #6366f1; font-size: 12px; font-weight: 500;")
         self.typing_status_label.setVisible(False)
-        self.order_title = QLabel("\uD0C0\uC774\uD551 \uC21C\uC11C: (\uC5C6\uC74C)")
+        self.order_title = QLabel("??´í ?ì: (?ì)")
         self.order_title.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.order_list = OrderListWidget()
         self.order_list.setMinimumHeight(260)
@@ -1522,7 +1526,7 @@ class NovaAILiteWindow(QWidget):
         self.order_list.customContextMenuRequested.connect(self._on_order_context_menu)
         self.order_list.filesDropped.connect(self._on_files_dropped)
 
-        self.btn_ai_type = QPushButton("\uBCF4\uB0B4\uAE30")
+        self.btn_ai_type = QPushButton(" ë³´ë´ê¸?)
         self.btn_ai_type.setIcon(_material_icon("\ue163", 18, QColor("#ffffff")))
         self.btn_ai_type.setIconSize(QSize(18, 18))
         self.btn_ai_type.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1544,9 +1548,9 @@ class NovaAILiteWindow(QWidget):
             "  border-radius: 8px; padding: 8px; font-size: 12px;"
             "  color: #333; font-family: 'Consolas', 'Pretendard', monospace; }"
         )
-        self._generated_code_label = QLabel("\uC0DD\uC131 \uCF54\uB4DC")
+        self._generated_code_label = QLabel("?ì±??ì½ë")
         self._generated_code_label.setStyleSheet("font-size: 13px; font-weight: 600; color: #333;")
-        self._code_type_btn = QPushButton("\uCF54\uB4DC \uD0C0\uC774\uD551")
+        self._code_type_btn = QPushButton("ì½ë ??´í")
         self._code_type_btn.setEnabled(False)
         self._code_type_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._code_type_btn.setStyleSheet(
@@ -1566,7 +1570,7 @@ class NovaAILiteWindow(QWidget):
         gen_header.addWidget(self._code_type_btn)
         gen_layout.addLayout(gen_header)
         gen_layout.addWidget(self.code_view)
-        # Hidden until user presses the typing-order button (AI ?????).
+        # Hidden until user presses the typing-order button (AI ??´í).
         self._generated_container.setVisible(False)
 
         # Typing order container (status + list + bottom row)
@@ -1596,7 +1600,7 @@ class NovaAILiteWindow(QWidget):
         order_layout.addWidget(list_stack_container, 1)
         self._order_list_stack = list_stack
 
-        # ???? ?? ??? ??(?????? ??, ???????? ??) ????
+        # ?? ê³ ì  ?¤ë ë°?(?ì´?ì ë°ê¹¥, ?ë???ë¨ ê³ ì ) ??
         _hdr_top = 6
         _hdr_h = 48
         _m = layout.contentsMargins()
@@ -1624,8 +1628,8 @@ class NovaAILiteWindow(QWidget):
         self._menu_btn.clicked.connect(self._toggle_sidebar)
         _h_lay.addWidget(self._menu_btn)
 
-        # ??? ????? ?? (?? ??????? ?????
-        self._download_form_btn = QPushButton("\uC591\uC2DD \uB2E4\uC6B4\uB85C\uB4DC")
+        # ?ì ?¤ì´ë¡ë ë²í¼ (ë©ë´ ?ì´ì½?ë°ë¡ ?¤ë¥¸ìª?
+        self._download_form_btn = QPushButton("?ì ?¤ì´ë¡ë")
         self._download_form_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._download_form_btn.setStyleSheet(
             "QPushButton { border: none; background: transparent;"
@@ -1638,8 +1642,7 @@ class NovaAILiteWindow(QWidget):
 
         _h_lay.addStretch(1)
 
-        # Right side header area (name and plan badge).
-        self._header_user_area = QWidget()
+        # ?¤ë¥¸ìª? ?ë°? ?ì´ì½?+ ?´ë¦/?ë ??ì¤?        self._header_user_area = QWidget()
         self._header_user_area.setCursor(Qt.CursorShape.PointingHandCursor)
         self._header_user_area.setStyleSheet("background: transparent;")
         self._header_user_area.installEventFilter(self)
@@ -1647,13 +1650,13 @@ class NovaAILiteWindow(QWidget):
         _hu_lay.setContentsMargins(6, 4, 10, 4)
         _hu_lay.setSpacing(8)
 
-        # ??? + ??? ?????
-        self._header_name = QLabel("\uB85C\uADF8\uC778")
+        # ?´ë¦ + ?ë ê°ë¡?ë°°ì¹
+        self._header_name = QLabel("?¬ì©??)
         self._header_name.setStyleSheet(
             "font-size: 12px; font-weight: 600; color: #1a1a2e; background: transparent;"
         )
 
-        self._header_plan = QLabel("\uBB34\uB8CC")
+        self._header_plan = QLabel("Free")
         self._header_plan.setFixedHeight(18)
         self._header_plan.setStyleSheet(
             "font-size: 9px; font-weight: 600; color: #6366f1;"
@@ -1664,7 +1667,8 @@ class NovaAILiteWindow(QWidget):
         _hu_lay.addWidget(self._header_name)
         _hu_lay.addWidget(self._header_plan)
 
-        # ??? ??????? ??? ??? ?? ??????
+        # ?´ë¦­ ?´ë²¤?¸ë? ?í ?¬ëª
+ ë²í¼ ?¤ë²?ì´
         self._header_user_btn = QPushButton(self._header_user_area)
         self._header_user_btn.setStyleSheet(
             "QPushButton { border: none; background: transparent; }"
@@ -1711,7 +1715,7 @@ class NovaAILiteWindow(QWidget):
         self._current_code_path: str | None = None
         self._code_view_updating = False
         self._ai_error_messages: dict[int, str] = {}
-        # Animate "????? status in the list.
+        # Animate "?ì±ì¤? status in the list.
         self._status_anim_timer = QTimer(self)
         self._status_anim_timer.setInterval(50)
         self._status_anim_timer.timeout.connect(self._tick_status_animation)
@@ -1722,7 +1726,7 @@ class NovaAILiteWindow(QWidget):
         if app is not None:
             app.installEventFilter(self)
         
-        # ???? ?????? ?????? & ?????? ??? (?????? ????, ?? ???) ????
+        # ?? ?¬ì´?ë° ?¤ë²?ì´ & ?¬ì´?ë° ?ì ¯ (?ì´?ì ?¸ë?, ì§ì  ?ì) ??
         self._sidebar_overlay = SidebarOverlay(self)
         self._sidebar_overlay.clicked.connect(self._close_sidebar)
         self._sidebar = SidebarWidget(self)
@@ -1730,30 +1734,32 @@ class NovaAILiteWindow(QWidget):
         self._sidebar.logout_clicked.connect(self._on_logout_clicked)
         self._sidebar.menu_clicked.connect(self._on_sidebar_menu)
 
-        # ?? ???????? ?????? (?? ?????)
+        # ì´ê¸° ?¬ì©???í ?
+ë°?´í¸ (ë¡ì»¬ ìºì?ì)
         self._load_stored_user()
         self._register_desktop_session_if_needed()
         self._update_user_status()
         
-        # Firebase??? ?? ??????????(???????
+        # Firebase?ì ìµì  ?ë¡???ê¸°??(ë°±ê·¸?¼ì´??
         QTimer.singleShot(500, self._refresh_profile_from_firebase)
 
     def _load_stored_user(self) -> None:
-        """?? ????? ????? ???????? ??"""
+        """ë¡ì»¬ ìºì?ì ??¥ë ?¬ì©???ë³´ ë¡ë"""
         user = get_stored_user()
         if user and user.get("uid"):
             self.profile_uid = user.get("uid")
-            self.profile_display_name = user.get("name") or "\uC0AC\uC6A9\uC790"
+            self.profile_display_name = user.get("name") or "?¬ì©??
             self.profile_plan = user.get("plan") or user.get("tier") or "Free"
             self.profile_avatar_url = user.get("photo_url")
         else:
             self.profile_uid = None
-            self.profile_display_name = "\uC0AC\uC6A9\uC790"
+            self.profile_display_name = "?¬ì©??
             self.profile_plan = "Free"
             self.profile_avatar_url = None
 
     def _register_desktop_session_if_needed(self) -> None:
-        """Single-device ?????Free/Plus/Test)??? ??? PC ??? ???."""
+        """Single-device ?ê¸??Free/Plus/Test)?ì ?ì¬ PC ?¸ì
+ ?±ë¡."""
         if not self.profile_uid:
             return
         user = get_stored_user() or {}
@@ -1794,16 +1800,16 @@ class NovaAILiteWindow(QWidget):
         self._apply_local_logout_state()
         QMessageBox.information(
             self,
-            "\uC138\uC158 \uC885\uB8CC",
-            "\uD604\uC7AC PC\uC5D0\uC11C \uC138\uC158\uC774 \uC885\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.\n"
-            "\uACC4\uC18D \uC774\uC6A9\uD558\uB824\uBA74 \uB2E4\uC2DC \uB85C\uADF8\uC778\uD574\uC8FC\uC138\uC694.",
+            "ë¡ê·¸?ì??,
+            "?¤ë¥¸ ì»´í¨?°ì??ë¡ê·¸?¸ë???ì¬ ê¸°ê¸°?ì ?ë ë¡ê·¸?ì?ì?µë??\n"
+            "Free/Plus ?ê¸?ë ?ì ?ì??1?ë§??ì©?©ë??",
         )
         self._remote_logout_in_progress = False
 
     def _apply_local_logout_state(self) -> None:
         logout_user()
         self.profile_uid = None
-        self.profile_display_name = "\uC0AC\uC6A9\uC790"
+        self.profile_display_name = "?¬ì©??
         self.profile_plan = "Free"
         self.profile_avatar_url = None
         self._profile_usage = 0
@@ -1811,17 +1817,18 @@ class NovaAILiteWindow(QWidget):
         self._update_user_status(refresh=False)
 
     def _refresh_profile_from_firebase(self) -> None:
-        """Refresh latest profile data from Firebase."""
+        """Firebase?ì ìµì  ?ë¡?ê³¼ ?¬ì©???ê¸°??""
         if not self.profile_uid:
             return
         self._schedule_profile_refresh(force=True)
 
     def _update_user_status(self, refresh: bool = True) -> None:
-        """???????????? ?????????????????? + ???????????"""
+        """?¬ì©??ë¡ê·¸???í ë°??¬ì©???ë³´ë¥??¬ì´?ë° + ?¤ë???
+ë°?´í¸"""
         _tier_map = {
-            "Free": "\uBB34\uB8CC", "free": "\uBB34\uB8CC",
+            "Free": "ë¬´ë£", "free": "ë¬´ë£",
             "Standard": "Standard", "Plus": "PLUS",
-            "Pro": "Ultra \uD50C\uB79C", "pro": "Ultra \uD50C\uB79C", "ultra": "Ultra \uD50C\uB79C",
+            "Pro": "Ultra ?ë", "pro": "Ultra ?ë", "ultra": "Ultra ?ë",
         }
         if self.profile_uid:
             tier = self.profile_plan or "Free"
@@ -1838,7 +1845,8 @@ class NovaAILiteWindow(QWidget):
                 limit=limit,
                 avatar_url=self.profile_avatar_url,
             )
-            # ??? ????????????????
+            # ?¤ë ?¤ë¥¸ìª??ë¡???
+ë°?´í¸
             t_label = _tier_map.get(tier, tier)
             _tier_colors = {
                 "Free": "#6366f1", "free": "#6366f1",
@@ -1847,7 +1855,7 @@ class NovaAILiteWindow(QWidget):
                 "Pro": "#8b5cf6", "pro": "#8b5cf6", "ultra": "#8b5cf6",
             }
             accent = _tier_colors.get(tier, "#6366f1")
-            self._header_name.setText(self.profile_display_name or "\uC0AC\uC6A9\uC790")
+            self._header_name.setText(self.profile_display_name or "?¬ì©??)
             self._header_plan.setText(t_label)
             self._header_plan.setVisible(True)
             self._header_plan.setStyleSheet(
@@ -1863,27 +1871,27 @@ class NovaAILiteWindow(QWidget):
                 uid=None, name="", email="", tier="Free",
                 usage=0, limit=5,
             )
-            self._header_name.setText("\uB85C\uADF8\uC778")
+            self._header_name.setText("ë¡ê·¸??)
             self._header_plan.setText("")
             self._header_plan.setVisible(False)
             self._header_user_area.setVisible(True)
         self._update_send_button_state()
 
     def _on_login_clicked(self) -> None:
-        """Handle login button click and start OAuth flow."""
+        """ë¡ê·¸??ë²í¼ ?´ë¦­ - ë¸ë¼?°ì?ë¡?OAuth ë¡ê·¸??""
         self._close_sidebar()
         self._sidebar._login_btn.setEnabled(False)
-        self._sidebar._login_btn.setText("\uB85C\uADF8\uC778 \uC911..")
+        self._sidebar._login_btn.setText("ë¡ê·¸??ì¤?..")
         
-        # ??????????OAuth ????????
+        # ë°±ê·¸?¼ì´?ì??OAuth ?ë¡???ì
         self._login_worker = LoginWorker()
         self._login_worker.finished.connect(self._on_login_finished)
         self._login_worker.start()
 
     def _on_login_finished(self, success: bool) -> None:
-        """OAuth ???????"""
+        """OAuth ë¡ê·¸???ë£"""
         self._sidebar._login_btn.setEnabled(True)
-        self._sidebar._login_btn.setText("\uB85C\uADF8\uC778")
+        self._sidebar._login_btn.setText("ë¡ê·¸??)
         
         if success:
             self._load_stored_user()
@@ -1891,39 +1899,39 @@ class NovaAILiteWindow(QWidget):
             self._update_user_status()
             dlg = LoginResultDialog(self, success=True, user_name=self.profile_display_name)
             dlg.exec()
-            # Refresh profile shortly after login completes.
-            QTimer.singleShot(100, self._refresh_profile_from_firebase)
+            # Firebase?ì ìµì  ?ë³´ ê°?¸ì¤ê¸?            QTimer.singleShot(100, self._refresh_profile_from_firebase)
         else:
             dlg = LoginResultDialog(self, success=False)
             dlg.exec()
 
     def _on_logout_clicked(self) -> None:
-        """????? ?? ???"""
+        """ë¡ê·¸?ì ë²í¼ ?´ë¦­"""
         self._close_sidebar()
         dlg = LogoutDialog(self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._apply_local_logout_state()
 
-    # ???? ??? ????? ??? ??????????????????????????????????????????????????????????
+    # ?? ?ì ?¤ì´ë¡ë ?ì
+ ?????????????????????????????
     def _on_download_form_clicked(self) -> None:
-        """??? ??? ????? ?? ???"""
+        """?¤ë ?ì ?¤ì´ë¡ë ë²í¼ ?´ë¦­"""
         dlg = DownloadFormDialog(self)
         dlg.exec()
 
-    # ???? Header user area click ????????????????????????????????????????????????
+    # ?? Header user area click ????????????????????????
     def _on_header_user_clicked(self) -> None:
-        """??? ???????? ??? ?????????????? ??"""
+        """?¤ë ?¬ì©???ì­ ?´ë¦­ ??ë¡ê·¸???í???°ë¼ ë¶ê¸°"""
         if self.profile_uid:
             self._toggle_usage_popup()
         else:
             self._on_login_clicked()
 
-    # ???? Usage popup helpers ????????????????????????????????????????????????????????
+    # ?? Usage popup helpers ????????????????????????????
     def _toggle_usage_popup(self) -> None:
-        """????????????????"""
+        """?¬ì©???¤ì´?¼ë¡ê·??ì"""
         self._show_usage_dialog()
 
-    # ???? Sidebar helpers ??????????????????????????????????????????????????????????????????
+    # ?? Sidebar helpers ?????????????????????????????????
     def _toggle_sidebar(self) -> None:
         if self._sidebar.isVisible():
             self._close_sidebar()
@@ -1975,10 +1983,10 @@ class NovaAILiteWindow(QWidget):
 
     def _show_profile_dialog(self) -> None:
         if not self.profile_uid:
-            NeedLoginDialog(self, title="\uB85C\uADF8\uC778 \uD544\uC694").exec()
+            NeedLoginDialog(self, title="?ì ?ë³´").exec()
             return
         user = get_stored_user()
-        email = user.get("email", "-") if user else "-"
+        email = user.get("email", "?ì") if user else "?ì"
         ProfileDialog(
             self,
             name=self.profile_display_name,
@@ -1989,7 +1997,7 @@ class NovaAILiteWindow(QWidget):
 
     def _show_usage_dialog(self) -> None:
         if not self.profile_uid:
-            NeedLoginDialog(self, title="\uB85C\uADF8\uC778 \uD544\uC694").exec()
+            NeedLoginDialog(self, title="?¬ì© ?´ì­").exec()
             return
         tier = self.profile_plan or "Free"
         UsageDialog(
@@ -2003,9 +2011,9 @@ class NovaAILiteWindow(QWidget):
     def _show_about_dialog(self) -> None:
         QMessageBox.about(
             self,
-            "Nova AI \uC18C\uAC1C",
+            "Nova AI ?ë³´",
             "Nova AI v1.0\n\n"
-            "\uC218\uB2A5 \uD615\uC2DD \uD0C0\uC774\uD551 AI\n\n"
+            "?ê? ?ì ??´í AI\n\n"
             "https://nova-ai.work",
         )
 
@@ -2047,15 +2055,15 @@ class NovaAILiteWindow(QWidget):
             )
             if cur_page > 0:
                 self._page_label.setText(
-                    f"{cur_page}/{total_page} page" if total_page > 0
-                    else f"{cur_page} page"
+                    f"{cur_page}/{total_page}ìª? if total_page > 0
+                    else f"{cur_page}ìª?
                 )
                 self._page_badge.setVisible(True)
             else:
                 self._page_badge.setVisible(False)
         else:
             HwpController.set_last_detected_filename("")
-            self.filename_label.setText("\uAC10\uC9C0 \uD30C\uC77C \uC5C6\uC74C")
+            self.filename_label.setText("ê°ì????ì¼ ?ì")
             self.filename_label.setStyleSheet(
                 "color: #9ca3af; font-size: 12px; font-weight: 500; background: transparent;"
             )
@@ -2096,7 +2104,7 @@ class NovaAILiteWindow(QWidget):
     def on_upload_image(self) -> None:
         file_paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "\uC774\uBBF8\uC9C0 \uC120\uD0DD",
+            "?¬ì§ ? í",
             "",
             "Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.pdf);;All Files (*)",
         )
@@ -2111,27 +2119,29 @@ class NovaAILiteWindow(QWidget):
         self._start_ai_run(auto_type=False)
 
     def on_ai_type_run(self) -> None:
-        self._set_typing_status("AI \uC0DD\uC131\uC911...")
+        self._set_typing_status("ê¸°ë¤ë¦¬ë ì¤?)
         # Hide generated code preview when using "send" flow.
         self._generated_container.setVisible(False)
         self._start_ai_run(auto_type=True)
 
     def _start_ai_run(self, auto_type: bool) -> None:
         if not self.selected_images:
-            QMessageBox.warning(self, "\uC54C\uB9BC", "\uC774\uBBF8\uC9C0\uB97C \uBA3C\uC800 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.")
+            QMessageBox.warning(self, "?ë´", "ë¨¼ì? ?¬ì§???
+ë¡?í?¸ì.")
             return
         remaining = self._get_remaining_send_quota()
         if remaining <= 0:
-            QMessageBox.warning(self, "\uC54C\uB9BC", "\uB0A8\uC740 \uC0AC\uC6A9 \uD69F\uC218\uAC00 \uC5C6\uC5B4 \uC2E4\uD589\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.")
+            QMessageBox.warning(self, "?ë´", "?¨ì? ?ìê° ?ì´ ?´ë?ì§ë¥?ë³´ë¼ ???ìµ?ë¤.")
             return
         if len(self.selected_images) > remaining:
             exceeded = len(self.selected_images) - remaining
             QMessageBox.warning(
                 self,
-                "\uC54C\uB9BC",
-                f"\uD604\uC7AC \uB0A8\uC740 \uD69F\uC218\uB294 {remaining}\uD68C\uC785\uB2C8\uB2E4.\n"
-                f"\uC120\uD0DD\uD55C {len(self.selected_images)}\uAC1C \uC911 {exceeded}\uAC1C\uB294 \uC81C\uC678\uB429\uB2C8\uB2E4.\n"
-                "\uB0A8\uC740 \uD69F\uC218 \uB0B4\uC5D0\uC11C\uB9CC \uCC98\uB9AC\uB429\uB2C8\uB2E4.",
+                "?ë´",
+                f"?¨ì? ?ì??{remaining}?ì
+?ë¤.\n"
+                f"?ì¬ {len(self.selected_images)}?¥ì ? í?ì¬ {exceeded}??ì´ê³¼?ì?µë??\n"
+                "ì´ê³¼???´ë?ì§???ê±°?????¤ì ë³´ë´ê¸??´ì£¼?¸ì.",
             )
             return
         if self._ai_worker and self._ai_worker.isRunning():
@@ -2142,7 +2152,7 @@ class NovaAILiteWindow(QWidget):
         self.generated_code = ""
         self.generated_codes = []
         self._generated_codes_by_index = [""] * len(self.selected_images)
-        self._gen_statuses = ["\uB300\uAE30\uC911"] * len(self.selected_images)
+        self._gen_statuses = ["?ê¸?] * len(self.selected_images)
         self._typed_indexes = set()
         self._next_auto_type_index = 0
         self._auto_type_has_inserted_any = False
@@ -2159,11 +2169,11 @@ class NovaAILiteWindow(QWidget):
 
     def on_type_run(self) -> None:
         if not self.generated_codes and not self.generated_code.strip():
-            QMessageBox.warning(self, "\uC54C\uB9BC", "\uBA3C\uC800 AI \uCF54\uB4DC \uC0DD\uC131\uC744 \uC2E4\uD589\uD574\uC8FC\uC138\uC694.")
+            QMessageBox.warning(self, "?ë´", "ë¨¼ì? AI ?¤í???ë¬ ì½ëë¥??ì±?ì¸??")
             return
         script = self._build_typing_script()
         if not script.strip():
-            QMessageBox.warning(self, "\uC54C\uB9BC", "\uD0C0\uC774\uD551\uD560 \uCF54\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.")
+            QMessageBox.warning(self, "?ë´", "?¤í??ì½ëê° ?ìµ?ë¤.")
             return
         self._ensure_typing_worker()
         target_filename = self._current_detected_filename()
@@ -2174,10 +2184,10 @@ class NovaAILiteWindow(QWidget):
         if not self.selected_images:
             self.order_title.setText("")
             return
-        self.order_title.setText("\uD0C0\uC774\uD551 \uC21C\uC11C:")
+        self.order_title.setText("??´í ?ì:")
         for idx, path in enumerate(self.selected_images):
             name = os.path.basename(path)
-            status = self._gen_statuses[idx] if idx < len(self._gen_statuses) else "\uB300\uAE30\uC911"
+            status = self._gen_statuses[idx] if idx < len(self._gen_statuses) else "?ê¸?
             item = QListWidgetItem(f"{idx + 1}. {name} - {status}")
             item.setData(Qt.ItemDataRole.UserRole, path)
             self.order_list.addItem(item)
@@ -2186,11 +2196,11 @@ class NovaAILiteWindow(QWidget):
         if idx < 0:
             return
         if idx >= len(self._gen_statuses):
-            self._gen_statuses.extend(["\uB300\uAE30\uC911"] * (idx + 1 - len(self._gen_statuses)))
+            self._gen_statuses.extend(["?ê¸?] * (idx + 1 - len(self._gen_statuses)))
         self._gen_statuses[idx] = status
-        if status.startswith("\uC624\uB958"):
-            message = status.replace("\uC624\uB958:", "").strip() if ":" in status else status
-            self._ai_error_messages[idx] = message or "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958"
+        if status.startswith("?¤ë¥"):
+            message = status.replace("?¤ë¥:", "").strip() if ":" in status else status
+            self._ai_error_messages[idx] = message or "?????ë ?¤ë¥"
         self._render_order_list()
 
     def _run_typing(self) -> None:
@@ -2244,10 +2254,10 @@ class NovaAILiteWindow(QWidget):
         while self._next_auto_type_index < total and self._auto_type_pending_idx is None:
             idx = self._next_auto_type_index
 
-            status = self._gen_statuses[idx] if idx < len(self._gen_statuses) else "\uB300\uAE30\uC911"
+            status = self._gen_statuses[idx] if idx < len(self._gen_statuses) else "?ê¸?
             # Not ready yet (still generating or not started).
-            if status in ("\uB300\uAE30\uC911", "\uC0DD\uC131\uC911..."):
-                self._set_typing_status("\uC0DD\uC131 \uC644\uB8CC \uB300\uAE30\uC911...")
+            if status in ("?ê¸?, "?ì±ì¤?):
+                self._set_typing_status("ê¸°ë¤ë¦¬ë ì¤?)
                 return
 
             code = (self._generated_codes_by_index[idx] or "").strip()
@@ -2256,7 +2266,7 @@ class NovaAILiteWindow(QWidget):
                 if idx not in self._skipped_indexes:
                     self._skipped_indexes.add(idx)
                     if idx < len(self._gen_statuses):
-                        self._gen_statuses[idx] = "\uAC74\uB108\uB700(\uCF54\uB4DC \uC5C6\uC74C)"
+                        self._gen_statuses[idx] = "?ì± ?¤í¨(ê±´ë?)"
                     self._render_order_list()
                 self._next_auto_type_index += 1
                 continue
@@ -2269,9 +2279,9 @@ class NovaAILiteWindow(QWidget):
             self._ensure_typing_worker()
             self._auto_type_pending_idx = idx
             if idx < len(self._gen_statuses):
-                self._gen_statuses[idx] = "\uD0C0\uC774\uD551\uC911..."
+                self._gen_statuses[idx] = "??´í ?ê¸?
             self._render_order_list()
-            self._set_typing_status("\uD0C0\uC774\uD551 \uC9C4\uD589\uC911...")
+            self._set_typing_status("??´í ì¤?)
             target_filename = self._current_detected_filename()
             # Pass original image path so insert_cropped_image can crop from it
             src_img = self.selected_images[idx] if idx < len(self.selected_images) else None
@@ -2309,30 +2319,32 @@ class NovaAILiteWindow(QWidget):
             failed_indexes = [i + 1 for i, code in enumerate(raw_codes) if not code.strip()]
             details: list[str] = []
             for i in failed_indexes:
-                msg = self._ai_error_messages.get(i - 1, "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958")
-                details.append(f"{i}\uBC88: {msg}")
+                msg = self._ai_error_messages.get(i - 1, "ë¹?ê²°ê³¼")
+                details.append(f"{i}ë²? {msg}")
             detail_text = "\n".join(details)
             QMessageBox.warning(
                 self,
-                "\uC624\uB958",
-                f"\uB2E4\uC74C \uD56D\uBAA9\uC5D0\uC11C \uCF54\uB4DC \uC0DD\uC131\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4: {failed_indexes}\n"
+                "?ë´",
+                f"?¼ë? ë¬¸ì ?ì ì½ë ?ì±???¤í¨?ìµ?ë¤: {failed_indexes}\n"
                 f"{detail_text}\n"
-                "\uC6D0\uBCF8 \uBB38\uC11C/\uC774\uBBF8\uC9C0\uB97C \uD655\uC778\uD55C \uB4A4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.",
+                "?¤í¨????ª©? ?¤ì ?ë?ê±°?? ?±ê³µ????ª©ë§??ë?¼ë¡ ??´í?????ìµ?ë¤.",
             )
         self._set_order_editable(True)
         self._update_code_type_button_state()
         
-        # ??? ???????????
+        # ? í° ?¬ì©???
+ë°?´í¸
         self._update_user_status(refresh=False)
         self._schedule_profile_refresh(force=True)
 
     def _on_ai_error(self, message: str) -> None:
         self._render_order_list()
-        QMessageBox.critical(self, "AI \uC624\uB958", message)
+        QMessageBox.critical(self, "AI ?¤ë¥", message)
         self._auto_type_after_ai = False
         self._set_order_editable(True)
         
-        # ??? ???????????
+        # ? í° ?¬ì©???
+ë°?´í¸
         self._update_user_status(refresh=False)
         self._schedule_profile_refresh(force=True)
 
@@ -2348,13 +2360,13 @@ class NovaAILiteWindow(QWidget):
 
     def _on_typing_item_started(self, idx: int) -> None:
         if idx >= 0 and idx < len(self._gen_statuses):
-            self._gen_statuses[idx] = "\uD0C0\uC774\uD551\uC911..."
+            self._gen_statuses[idx] = "??´íì¤?
             self._render_order_list()
-        self._set_typing_status("\uD0C0\uC774\uD551 \uC9C4\uD589\uC911...")
+        self._set_typing_status("??´í ì¤?)
 
     def _on_typing_item_finished(self, idx: int) -> None:
         if idx >= 0 and idx < len(self._gen_statuses):
-            self._gen_statuses[idx] = "\uD0C0\uC774\uD551 \uC644\uB8CC"
+            self._gen_statuses[idx] = "??´í ?ë£"
             self._render_order_list()
         if idx >= 0 and self._auto_type_pending_idx == idx:
             self._auto_type_pending_idx = None
@@ -2364,23 +2376,23 @@ class NovaAILiteWindow(QWidget):
                 self._try_auto_type()
             if self._next_auto_type_index >= len(self.selected_images):
                 self._auto_type_after_ai = False
-                self._set_typing_status("\uD0C0\uC774\uD551 \uC644\uB8CC")
+                self._set_typing_status("??´í ?ë£")
                 return
         if not self._auto_type_after_ai and self._auto_type_pending_idx is None:
-            self._set_typing_status("\uD0C0\uC774\uD551 \uC644\uB8CC")
+            self._set_typing_status("??´í ?ë£")
 
     def _on_typing_cancelled(self) -> None:
         # Stop auto-type chain, keep generated code for manual re-run.
         self._auto_type_after_ai = False
         self._auto_type_pending_idx = None
         self._set_typing_status("")
-        QMessageBox.information(self, "\uC54C\uB9BC", "\uD0C0\uC774\uD551\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.")
+        QMessageBox.information(self, "?ë´", "??´í??ì¤ë¨?ì?µë??")
 
     def _on_typing_error(self, message: str) -> None:
         self._auto_type_after_ai = False
         self._auto_type_pending_idx = None
         self._set_typing_status("")
-        QMessageBox.critical(self, "\uD0C0\uC774\uD551 \uC624\uB958", message)
+        QMessageBox.critical(self, "??´í ?¤ë¥", message)
 
     def _cancel_typing(self) -> None:
         if self._typing_worker and self._typing_worker.isRunning():
@@ -2506,14 +2518,14 @@ class NovaAILiteWindow(QWidget):
         if item is None:
             return
         menu = QMenu(self)
-        remove_action = menu.addAction("\uBAA9\uB85D\uC5D0\uC11C \uC81C\uAC70")
+        remove_action = menu.addAction("??ª© ?ê±°")
         action = menu.exec(self.order_list.mapToGlobal(pos))
         if action == remove_action:
             self._remove_order_item(item)
 
     def _remove_order_item(self, item: QListWidgetItem) -> None:
         if not self._is_order_editable():
-            QMessageBox.information(self, "\uC54C\uB9BC", "\uC0DD\uC131 \uC911\uC5D0\uB294 \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.")
+            QMessageBox.information(self, "?ë´", "?ì± ì¤ì????ª©??ë³ê²½í  ???ìµ?ë¤.")
             return
         idx = self.order_list.row(item)
         if idx < 0 or idx >= len(self.selected_images):
@@ -2530,8 +2542,8 @@ class NovaAILiteWindow(QWidget):
         if next_images and not is_logged_in():
             QMessageBox.information(
                 self,
-                "\uB85C\uADF8\uC778 \uD544\uC694",
-                "\uC774\uBBF8\uC9C0\uB97C \uCD94\uAC00\uD558\uB824\uBA74 \uBA3C\uC800 \uB85C\uADF8\uC778\uD574\uC8FC\uC138\uC694.",
+                "ë¡ê·¸???ì",
+                "?´ë?ì§ë¥??£ì¼?¤ë©´ ë¨¼ì? ë¡ê·¸?¸í´???´ì© ê°?¥í©?ë¤.",
             )
             return
         if next_images:
@@ -2553,9 +2565,9 @@ class NovaAILiteWindow(QWidget):
             f"{idx + 1}. {os.path.basename(path)}"
             for idx, path in enumerate(self.selected_images)
         ]
-        self.order_title.setText("\uD0C0\uC774\uD551 \uC21C\uC11C:\n" + "\n".join(order_lines))
+        self.order_title.setText("??´í ?ì:\n" + "\n".join(order_lines))
         self._generated_codes_by_index = [""] * len(self.selected_images)
-        self._gen_statuses = ["\uB300\uAE30\uC911"] * len(self.selected_images)
+        self._gen_statuses = ["?ê¸?] * len(self.selected_images)
         self._render_order_list()
         self._current_code_index = -1
         self._current_code_path = None
@@ -2607,8 +2619,8 @@ class NovaAILiteWindow(QWidget):
             if show_message:
                 QMessageBox.warning(
                     self,
-                    "\uC54C\uB9BC",
-                    "\uB0A8\uC740 \uC0AC\uC6A9 \uD69F\uC218\uAC00 \uC5C6\uC5B4 \uC774\uBBF8\uC9C0\uB97C \uCD94\uAC00\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
+                    "?ë´",
+                    "?¨ì? ?ìê° ?ì´ ?´ë?ì§ë¥?ì¶ê??????ìµ?ë¤.",
                 )
             return []
         if len(image_paths) <= remaining:
@@ -2618,9 +2630,10 @@ class NovaAILiteWindow(QWidget):
         if show_message:
             QMessageBox.information(
                 self,
-                "\uC54C\uB9BC",
-                f"\uD604\uC7AC \uB0A8\uC740 \uD69F\uC218\uB294 {remaining}\uD68C\uC785\uB2C8\uB2E4.\n"
-                f"\uC120\uD0DD\uD55C {len(image_paths)}\uAC1C \uC911 {exceeded}\uAC1C\uB9CC \uC81C\uC678\uD558\uACE0 \uCD94\uAC00\uB429\uB2C8\uB2E4.",
+                "?ë´",
+                f"?¨ì? ?ì??{remaining}?ì
+?ë¤.\n"
+                f"? í??{len(image_paths)}??ì¤?{exceeded}?¥ì? ì´ê³¼?ì´ ì¶ê??ì? ?ì?µë??",
             )
         return image_paths[:remaining]
 
@@ -2637,7 +2650,7 @@ class NovaAILiteWindow(QWidget):
         if len(self.selected_images) > remaining:
             self.btn_ai_type.setEnabled(False)
             return
-        if status and status != "\uD0C0\uC774\uD551 \uC644\uB8CC":
+        if status and status != "??´í ?ë£":
             self.btn_ai_type.setEnabled(False)
             return
         self.btn_ai_type.setEnabled(True)
@@ -2675,7 +2688,7 @@ class NovaAILiteWindow(QWidget):
     def _on_code_type_clicked(self) -> None:
         idx = self._current_code_index
         if idx < 0 or idx >= len(self._generated_codes_by_index):
-            QMessageBox.warning(self, "\uC54C\uB9BC", "\uC120\uD0DD\uB41C \uCF54\uB4DC \uD56D\uBAA9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.")
+            QMessageBox.warning(self, "?ë´", "ë¨¼ì? ??ª©??? í?ì¸??")
             return
         self._type_code_for_index(idx)
 
@@ -2686,12 +2699,12 @@ class NovaAILiteWindow(QWidget):
             self._sync_current_code_from_view()
         script = (self._generated_codes_by_index[idx] or "").strip()
         if not script:
-            QMessageBox.warning(self, "\uC54C\uB9BC", "\uD0C0\uC774\uD551\uD560 \uCF54\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.")
+            QMessageBox.warning(self, "?ë´", "?¤í??ì½ëê° ?ìµ?ë¤.")
             return
         # Ensure only the selected item is typed.
         self._auto_type_after_ai = False
         self._auto_type_pending_idx = None
-        self._set_typing_status("\uC120\uD0DD \uCF54\uB4DC \uD0C0\uC774\uD551\uC911...")
+        self._set_typing_status("??´í ì¤?)
         self._ensure_typing_worker()
         target_filename = self._current_detected_filename()
         src_img = self.selected_images[idx] if idx < len(self.selected_images) else None
@@ -2704,7 +2717,7 @@ class NovaAILiteWindow(QWidget):
             return active_name
 
         text = (self.filename_label.text() or "").strip()
-        if not text or text in ("\uAC10\uC9C0 \uD30C\uC77C \uC5C6\uC74C", "\uD30C\uC77C \uC5C6\uC74C"):
+        if not text or text in ("ê°ì????ì¼ ?ì", "ê°ì? ?¤ë¥"):
             return None
         return text
 
@@ -2719,7 +2732,7 @@ class NovaAILiteWindow(QWidget):
 
     def _on_order_delete_clicked(self, idx: int) -> None:
         if not self._is_order_editable():
-            QMessageBox.information(self, "\uC54C\uB9BC", "\uC0DD\uC131 \uC911\uC5D0\uB294 \uBAA9\uB85D\uC744 \uC218\uC815\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.")
+            QMessageBox.information(self, "?ë´", "?ì± ì¤ì????ª©??ë³ê²½í  ???ìµ?ë¤.")
             return
         item = self.order_list.item(idx)
         if item is None:
@@ -2740,7 +2753,7 @@ class NovaAILiteWindow(QWidget):
         if idx < len(self._generated_codes_by_index):
             code = self._generated_codes_by_index[idx] or ""
         if not code.strip():
-            QMessageBox.information(self, "\uCF54\uB4DC \uBCF4\uAE30", "\uC544\uC9C1 \uC0DD\uC131\uB41C \uCF54\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.")
+            QMessageBox.information(self, "ì½ë ë³´ê¸°", "????ª©?ë ì½ëê° ?ìµ?ë¤.")
             return
         self._code_view_dialog.set_code(title, code)
         self._code_view_dialog.show()
@@ -2763,7 +2776,7 @@ class NovaAILiteWindow(QWidget):
 
 def _is_rpc_unavailable_message(message: str) -> bool:
     return (
-        "RPC ??????????????????" in message
+        "RPC ?ë²ë¥??¬ì©?????ìµ?ë¤" in message
         or "RPC server is unavailable" in message
         or "0x800706BA" in message
         or "-2147023174" in message
@@ -2838,8 +2851,8 @@ class TypingWorker(QThread):
                 )
                 if not resolved_target:
                     self.error.emit(
-                        "??? ?????? ???? ??????? ??????? "
-                        "??????????? ??????????????? ????? ????????"
+                        "?ì¬ ?ì±?ë ?ê? ë¬¸ìë¥?ì°¾ì? ëª»í?µë?? "
+                        "??´í???ê? ë¬¸ìë¥??´ë¦­???ì±?í ???¤ì ?ë?ì¸??"
                     )
                     return
                 if controller is None:
@@ -2944,13 +2957,13 @@ class DropPlaceholder(QWidget):
         )
         icon_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         icon_label.setStyleSheet("background: transparent; border: none;")
-        text_label = QLabel("\uD30C\uC77C\uC744 \uC5EC\uAE30\uC5D0 \uB04C\uC5B4\uB193\uAC70\uB098 \uD074\uB9AD\uD574 \uC5C5\uB85C\uB4DC\uD558\uC138\uC694")
+        text_label = QLabel("?¬ì§???£ì¼?¤ë©´ ?ëê·¸ì¤?ë¡­?ì¸??)
         text_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
         text_label.setStyleSheet(
             "color: #9ca3af; background-color: transparent; border: none;"
             "font-size: 13px;"
         )
-        hint_label = QLabel("PNG, JPG, PDF \uD30C\uC77C \uC9C0\uC6D0")
+        hint_label = QLabel("PNG, JPG, PDF ?ì¼ ì§??)
         hint_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         hint_label.setStyleSheet(
             "color: #c4c8d4; background: transparent; border: none;"
@@ -2986,7 +2999,7 @@ class DropPlaceholder(QWidget):
 
 class OrderListDelegate(QStyledItemDelegate):
     """
-    Draw the status part with a wavy black->white animation when status is animating.
+    Draw the status part with a wavy black->white animation when status == "?ì±ì¤?.
     Item text format is expected: "{n}. {name} - {status}".
     """
 
@@ -3078,14 +3091,14 @@ class OrderListDelegate(QStyledItemDelegate):
 
         # Color mapping for status labels.
         status_colors = {
-            "\uB300\uAE30\uC911": QColor("#9ca3af"),
-            "\uC0DD\uC131\uC911...": None,   # animated pulse
-            "\uD0C0\uC774\uD551\uC911...": None,       # animated pulse
-            "\uD0C0\uC774\uD551 \uC9C4\uD589\uC911...": QColor("#d97706"),
-            "\uD0C0\uC774\uD551 \uC644\uB8CC": QColor("#059669"),
-            "\uCF54\uB4DC \uC0DD\uC131 \uC644\uB8CC": QColor("#6366f1"),
-            "\uD0C0\uC774\uD551 \uC624\uB958": QColor("#ef4444"),
-            "\uAC74\uB108\uB700(\uCF54\uB4DC \uC5C6\uC74C)": QColor("#f97316"),
+            "?ê¸?: QColor("#9ca3af"),
+            "?ì±ì¤?: None,  # animated pulse
+            "??´íì¤?: None,  # animated pulse
+            "??´í ?ê¸?: QColor("#d97706"),
+            "ì½ë ?ì± ?ë£": QColor("#059669"),
+            "??´í ?ë£": QColor("#6366f1"),
+            "?¤ë¥(ë¹?ê²°ê³¼)": QColor("#ef4444"),
+            "?ì± ?¤í¨(ê±´ë?)": QColor("#f97316"),
         }
 
         if status_text not in status_colors:
@@ -3157,10 +3170,10 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
 
-    # ???? Load custom fonts (Material Icons only) ????????????????
+    # ?? Load custom fonts (Material Icons only) ????????
     _load_app_fonts()
 
-    # ???? Set global app icon (taskbar/alt-tab) ??????????????????
+    # ?? Set global app icon (taskbar/alt-tab) ?????????
     _app_dir = Path(__file__).resolve().parent
     _icon_candidates = [
         _app_dir / "logo33.png",
@@ -3173,7 +3186,7 @@ def main() -> None:
             app.setWindowIcon(QIcon(str(_icon_path)))
             break
 
-    # ???? Clean light palette ??????????????????????????????????????????????????????????
+    # ?? Clean light palette ?????????????????????????????
     pal = QPalette()
     pal.setColor(QPalette.ColorRole.Window, QColor("#ffffff"))
     pal.setColor(QPalette.ColorRole.WindowText, QColor("#1a1a2e"))
@@ -3188,7 +3201,7 @@ def main() -> None:
     pal.setColor(QPalette.ColorRole.ToolTipText, QColor("#333"))
     pal.setColor(QPalette.ColorRole.PlaceholderText, QColor("#9ca3af"))
     app.setPalette(pal)
-    # ????????????????????????????????????????????????????????????????????????????????????????????????????????
+    # ????????????????????????????????????????????????????
 
     window = NovaAILiteWindow()
     window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
