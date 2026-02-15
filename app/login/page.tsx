@@ -103,17 +103,18 @@ function LoginContent() {
 
     useEffect(() => {
         // Desktop login flow can request explicit account switching.
-        // In that mode, sign out any existing web session first.
-        if (!forceAccountSwitch || loading || !isAuthenticated) return;
-        if (hasForcedLogoutRef.current) return;
-
+        // Consume this flag exactly once after the first auth check:
+        // - if already signed in, force a one-time logout
+        // - if already signed out, do nothing (and never logout after a new login)
+        if (!forceAccountSwitch || loading || hasForcedLogoutRef.current) return;
         hasForcedLogoutRef.current = true;
+        if (!isAuthenticated) return;
+
         (async () => {
             try {
                 await logout();
             } catch (err) {
                 console.error("Forced logout for account switch failed:", err);
-                hasForcedLogoutRef.current = false;
             }
         })();
     }, [forceAccountSwitch, loading, isAuthenticated, logout]);
