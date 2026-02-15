@@ -1409,11 +1409,15 @@ class NovaAILiteWindow(QWidget):
         # ??????????
         _app_dir = Path(__file__).resolve().parent
         _icon_candidates = [
+            # Preferred icon: project public asset.
+            _app_dir.parent / "public" / "pabicon789.png",
+            _app_dir / "pabicon789.png",
             _app_dir / "logo33.png",
             _app_dir / "nova_ai.ico",
-            # PyInstaller ?? ???? ??
-            Path(getattr(sys, '_MEIPASS', '')) / "logo33.png" if getattr(sys, '_MEIPASS', None) else None,
-            Path(getattr(sys, '_MEIPASS', '')) / "nova_ai.ico" if getattr(sys, '_MEIPASS', None) else None,
+            # PyInstaller bundle paths.
+            Path(getattr(sys, "_MEIPASS", "")) / "pabicon789.png" if getattr(sys, "_MEIPASS", None) else None,
+            Path(getattr(sys, "_MEIPASS", "")) / "logo33.png" if getattr(sys, "_MEIPASS", None) else None,
+            Path(getattr(sys, "_MEIPASS", "")) / "nova_ai.ico" if getattr(sys, "_MEIPASS", None) else None,
         ]
         for _icon_path in _icon_candidates:
             if _icon_path and _icon_path.exists():
@@ -1692,6 +1696,11 @@ class NovaAILiteWindow(QWidget):
         self._filename_worker: FilenameWorker | None = None
         self._profile_worker: ProfileRefreshWorker | None = None
         self._session_guard_worker: SessionGuardWorker | None = None
+        self._profile_refresh_force_pending = False
+        self._post_login_sync_attempts_left = 0
+        self._post_login_sync_timer = QTimer(self)
+        self._post_login_sync_timer.setSingleShot(True)
+        self._post_login_sync_timer.timeout.connect(self._run_post_login_profile_sync)
         self._profile_usage = 0
         self._profile_usage_last_refresh = 0.0
         self._desktop_session_id = uuid.uuid4().hex
@@ -1802,6 +1811,9 @@ class NovaAILiteWindow(QWidget):
 
     def _apply_local_logout_state(self) -> None:
         logout_user()
+        self._post_login_sync_timer.stop()
+        self._post_login_sync_attempts_left = 0
+        self._profile_refresh_force_pending = False
         self.profile_uid = None
         self.profile_display_name = "\uC0AC\uC6A9\uC790"
         self.profile_plan = "Free"
@@ -1888,14 +1900,33 @@ class NovaAILiteWindow(QWidget):
         if success:
             self._load_stored_user()
             self._register_desktop_session_if_needed()
-            self._update_user_status()
+            self._update_user_status(refresh=False)
             dlg = LoginResultDialog(self, success=True, user_name=self.profile_display_name)
             dlg.exec()
-            # Refresh profile shortly after login completes.
-            QTimer.singleShot(100, self._refresh_profile_from_firebase)
+            # Retry profile sync a few times after login to absorb web-state propagation delay.
+            self._start_post_login_profile_sync()
         else:
             dlg = LoginResultDialog(self, success=False)
             dlg.exec()
+
+    def _start_post_login_profile_sync(self) -> None:
+        if not self.profile_uid:
+            return
+        self._post_login_sync_timer.stop()
+        self._post_login_sync_attempts_left = 4
+        self._schedule_profile_refresh(force=True)
+        self._post_login_sync_timer.start(1200)
+
+    def _run_post_login_profile_sync(self) -> None:
+        if not self.profile_uid:
+            self._post_login_sync_attempts_left = 0
+            return
+        if self._post_login_sync_attempts_left <= 0:
+            return
+        self._post_login_sync_attempts_left -= 1
+        self._schedule_profile_refresh(force=True)
+        if self._post_login_sync_attempts_left > 0:
+            self._post_login_sync_timer.start(1200)
 
     def _on_logout_clicked(self) -> None:
         """????? ?? ???"""
@@ -2074,7 +2105,10 @@ class NovaAILiteWindow(QWidget):
         if not force and (now - self._profile_usage_last_refresh) < 30:
             return
         if self._profile_worker and self._profile_worker.isRunning():
+            if force:
+                self._profile_refresh_force_pending = True
             return
+        self._profile_refresh_force_pending = False
         self._profile_worker = ProfileRefreshWorker(self.profile_uid, force_usage_refresh=force)
         self._profile_worker.finished.connect(self._on_profile_refreshed)
         self._profile_worker.start()
@@ -2092,6 +2126,9 @@ class NovaAILiteWindow(QWidget):
         self._profile_usage = max(0, int(usage or 0))
         self._profile_usage_last_refresh = time.time()
         self._update_user_status(refresh=False)
+        if self._profile_refresh_force_pending and self.profile_uid:
+            self._profile_refresh_force_pending = False
+            QTimer.singleShot(0, lambda: self._schedule_profile_refresh(force=True))
 
     def on_upload_image(self) -> None:
         file_paths, _ = QFileDialog.getOpenFileNames(
@@ -3163,8 +3200,11 @@ def main() -> None:
     # ???? Set global app icon (taskbar/alt-tab) ??????????????????
     _app_dir = Path(__file__).resolve().parent
     _icon_candidates = [
+        _app_dir.parent / "public" / "pabicon789.png",
+        _app_dir / "pabicon789.png",
         _app_dir / "logo33.png",
         _app_dir / "nova_ai.ico",
+        Path(getattr(sys, "_MEIPASS", "")) / "pabicon789.png" if getattr(sys, "_MEIPASS", None) else None,
         Path(getattr(sys, "_MEIPASS", "")) / "logo33.png" if getattr(sys, "_MEIPASS", None) else None,
         Path(getattr(sys, "_MEIPASS", "")) / "nova_ai.ico" if getattr(sys, "_MEIPASS", None) else None,
     ]
