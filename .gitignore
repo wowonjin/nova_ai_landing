@@ -48,7 +48,3 @@ next-env.d.ts
 *.msi
 *.deb
 *.rpm
-
-.vercel
-
-.vercel
