@@ -31,7 +31,7 @@ interface PricingPlan {
     features: string[];
     cta: string;
     popular?: boolean;
-    tier: "free" | "plus" | "pro";
+    tier: "free" | "go" | "plus" | "pro";
 }
 
 type BillingCycle = "monthly" | "yearly";
@@ -54,6 +54,24 @@ const plans: PricingPlan[] = [
         ],
         cta: "무료로 시작하기",
         tier: "free",
+    },
+    {
+        name: "Go 요금제",
+        subDescription: "핵심 기능을 합리적인 가격으로 시작하세요.",
+        prices: {
+            monthly: "11,900",
+            yearly: "8,330",
+        },
+        features: [
+            "월 132회 AI 타이핑 생성",
+            "고급 AI 모델",
+            "기본 협업 기능",
+            "이메일 지원",
+            "복수 계정 작업 불가능",
+            "월 1회 1:1 컨설팅 미제공",
+        ],
+        cta: "Go 시작하기",
+        tier: "go",
     },
     {
         name: "Plus 요금제",
@@ -101,9 +119,19 @@ export default function Pricing() {
     const [billingCycle, setBillingCycle] = useState<BillingCycle>("yearly");
 
     const paymentMetaByTier: Record<
-        "plus" | "pro",
+        "go" | "plus" | "pro",
         Record<BillingCycle, { amount: number; orderName: string }>
     > = {
+        go: {
+            monthly: {
+                amount: 11900,
+                orderName: "Nova AI Go 요금제 (월간 결제)",
+            },
+            yearly: {
+                amount: 99960,
+                orderName: "Nova AI Go 요금제 (연간 결제, 월 30% 할인 적용)",
+            },
+        },
         plus: {
             monthly: {
                 amount: 29900,

@@ -1499,6 +1499,13 @@ nextjs-portal {
     }
 }
 
+@media (min-width: 1200px) {
+    .pricing-cards-wrapper {
+        grid-template-columns: repeat(4, 1fr);
+        max-width: 1440px;
+    }
+}
+
 /* Card base */
 .pricing-card-v2 {
     background: #212121;
@@ -1709,10 +1716,20 @@ nextjs-portal {
     color: #f7f7ff;
 }
 
+.pricing-cta-v2--go {
+    background: #e7e7ea;
+    border: none;
+    color: #2e3037;
+}
+
 .pricing-cta-v2--pro {
     background: #e7e7ea;
     border: none;
     color: #2e3037;
+}
+
+.pricing-card-v2--go {
+    border: 1px solid #2b2d33;
 }
 
 .pricing-card-v2--pro {
@@ -1876,7 +1893,7 @@ nextjs-portal {
    ======================================== */
 .footer {
     background: #000;
-    border: none;
+    border-top: 1px solid #2f3338;
     border-radius: 0;
     color: #d6dbe5;
     padding: 3.5rem var(--padding-x) 5rem;

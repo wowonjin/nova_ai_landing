@@ -8,8 +8,12 @@ from typing import Optional
 
 def _debug(msg: str) -> None:
     if sys.stderr is not None:
-        sys.stderr.write(msg + "\n")
-        sys.stderr.flush()
+        try:
+            sys.stderr.write(msg + "\n")
+            sys.stderr.flush()
+        except Exception:
+            # Windowed executables may not have a writable stderr handle.
+            pass
 
 from prompt_loader import get_image_instructions_prompt
 from backend.oauth_desktop import get_stored_user

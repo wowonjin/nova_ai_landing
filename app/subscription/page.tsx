@@ -71,7 +71,7 @@ export default function SubscriptionDashboard() {
     };
 
     const handleStartSubscription = async (
-        plan: "plus" | "pro",
+        plan: "go" | "plus" | "pro",
         cycle: "monthly" | "yearly",
     ) => {
         if (!subscription?.billingKey) {
@@ -84,13 +84,14 @@ export default function SubscriptionDashboard() {
         try {
             // 프로필 페이지의 구독 로직을 재사용 (단건 결제)
             const planPrices = {
+                go: { monthly: 11900, yearly: 99960 },
                 plus: { monthly: 29900, yearly: 251160 },
                 pro: { monthly: 99000, yearly: 831600 },
             };
 
             const amount = planPrices[plan][cycle];
             const orderName = `Nova AI ${
-                plan === "plus" ? "Plus" : "Ultra"
+                plan === "go" ? "Go" : plan === "plus" ? "Plus" : "Ultra"
             } 요금제`;
 
             // 단건 결제로 이동
@@ -310,6 +311,33 @@ export default function SubscriptionDashboard() {
                     <div style={styles.section}>
                         <h2 style={styles.sectionTitle}>🚀 구독 시작</h2>
                         <div style={styles.planGrid}>
+                            <div style={styles.planCard}>
+                                <h3 style={styles.planTitle}>Go 요금제</h3>
+                                <p style={styles.planPrice}>월 11,900원</p>
+                                <button
+                                    style={styles.button}
+                                    onClick={() =>
+                                        handleStartSubscription("go", "monthly")
+                                    }
+                                    disabled={actionLoading === "subscribe_go_monthly"}
+                                >
+                                    {actionLoading === "subscribe_go_monthly"
+                                        ? "처리 중..."
+                                        : "월간 구독"}
+                                </button>
+                                <button
+                                    style={styles.secondaryButton}
+                                    onClick={() =>
+                                        handleStartSubscription("go", "yearly")
+                                    }
+                                    disabled={actionLoading === "subscribe_go_yearly"}
+                                >
+                                    {actionLoading === "subscribe_go_yearly"
+                                        ? "처리 중..."
+                                        : "연간 구독 (99,960원)"}
+                                </button>
+                            </div>
+
                             <div style={styles.planCard}>
                                 <h3 style={styles.planTitle}>Plus 요금제</h3>
                                 <p style={styles.planPrice}>월 29,900원</p>

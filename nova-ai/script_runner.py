@@ -32,6 +32,83 @@ class ScriptRunner:
     def __init__(self, controller: HwpController) -> None:
         self._controller = controller
 
+    def _looks_like_hwpeq_text(self, text: str) -> bool:
+        s = (text or "").strip()
+        if not s:
+            return False
+        strong_markers = (
+            "{rm",
+            "rm ",
+            "{bold",
+            "bold ",
+            "vec{",
+            "CDOT",
+            "dint",
+            "curl",
+            "div",
+            "LEFT",
+            "RIGHT",
+            "over",
+            "sqrt",
+            "it ",
+            "SIM",
+            "DEG",
+            "ANGLE",
+            "pi",
+        )
+        if not any(marker in s for marker in strong_markers):
+            return False
+        return bool(
+            re.search(
+                r"[=^_{}()]|CDOT|LEFT|RIGHT|dint|curl|div|vec|rm|bold",
+                s,
+            )
+        )
+
+    def _promote_math_insert_text_calls(self, lines: List[str]) -> List[str]:
+        """
+        If a line uses insert_text(...) but the payload clearly looks like
+        HwpEqn syntax, promote it to insert_equation(...).
+        """
+        out: List[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped.startswith("insert_text("):
+                out.append(line)
+                continue
+            try:
+                node = ast.parse(stripped, mode="eval")
+            except Exception:
+                out.append(line)
+                continue
+            call = node.body
+            if not isinstance(call, ast.Call):
+                out.append(line)
+                continue
+            if not isinstance(call.func, ast.Name) or call.func.id != "insert_text":
+                out.append(line)
+                continue
+            if len(call.args) != 1 or call.keywords:
+                out.append(line)
+                continue
+
+            arg = call.args[0]
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                text_arg = arg.value
+            elif isinstance(arg, ast.Str):
+                text_arg = arg.s
+            else:
+                out.append(line)
+                continue
+
+            if not self._looks_like_hwpeq_text(text_arg):
+                out.append(line)
+                continue
+
+            indent = line[: len(line) - len(line.lstrip())]
+            out.append(f"{indent}insert_equation({text_arg!r})")
+        return out
+
     def _split_concat_calls(self, line: str) -> List[str]:
         if " + " not in line:
             return [line]
@@ -1111,8 +1188,14 @@ class ScriptRunner:
         log: LogFn | None = None,
         *,
         cancel_check: CancelCheck | None = None,
+        source_image_path: str | None = None,
+        **_: object,
     ) -> None:
         log_fn = log or (lambda *_: None)
+        # Kept for backward compatibility with callers that pass image context
+        # for optional helpers (e.g. insert_cropped_image). This runner currently
+        # does not require the path, but must accept it to avoid runtime failures.
+        _ = source_image_path
         cleaned = textwrap.dedent(script or "").strip()
         # Normalize line separators (Windows CRLF / unicode separators)
         cleaned = (
@@ -1144,6 +1227,7 @@ class ScriptRunner:
         for line in self._repair_multiline_calls(cleaned.split("\n")):
             for sub_line in self._split_concat_calls(line):
                 expanded_lines.append(sub_line)
+        expanded_lines = self._promote_math_insert_text_calls(expanded_lines)
         expanded_lines = self._normalize_placeholders(expanded_lines)
         expanded_lines = self._split_dual_content_in_header(expanded_lines)
         expanded_lines = self._normalize_box_paragraphs(expanded_lines)

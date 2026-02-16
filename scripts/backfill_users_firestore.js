@@ -69,8 +69,10 @@ function sanitize(value) {
 function inferPlan(amount, billingCycle, fallbackPlan) {
     if (billingCycle === "test") return "test";
     if (typeof amount === "number") {
+        if (amount === 11900 || amount === 99960) return "go";
         if (amount >= 99000) return "pro";
         if (amount >= 29900) return "plus";
+        if (amount >= 11900) return "go";
         return "free";
     }
     if (typeof fallbackPlan === "string") return fallbackPlan;

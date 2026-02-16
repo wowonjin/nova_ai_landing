@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
                             "monthly",
                         );
                         const plan =
+                            inferredPlan === "go" ||
                             inferredPlan === "plus" ||
                             inferredPlan === "pro" ||
                             inferredPlan === "test"
@@ -181,6 +182,7 @@ export async function POST(request: NextRequest) {
                 // map amount to plan
                 const inferredPlan = inferPlanFromAmount(totalAmount, "monthly");
                 const plan =
+                    inferredPlan === "go" ||
                     inferredPlan === "plus" ||
                     inferredPlan === "pro" ||
                     inferredPlan === "test"

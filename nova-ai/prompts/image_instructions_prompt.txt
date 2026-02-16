@@ -184,6 +184,12 @@ Use insert_equation() for ALL math.
 Do not write formulas in insert_text().
 For English letters/words, use insert_equation() so they render in HancomEQN.
 
+↔ EQUIVALENCE ARROW RULE:
+- If you see a double arrow / equivalence sign (↔), write it as:
+  LRARROW
+- Do NOT use IFF.
+- Example: insert_equation('P LRARROW Q')
+
 🔬 SCIENCE UNITS / QUANTITIES:
 - In science problems, any physical quantity unit or symbol in formulas must use rm.
 - Examples: 1550`rm nm, 52`rm kHz, 400 ~ 700`rm nm, 9.8`rm m/s^2
@@ -283,6 +289,37 @@ PLUS-MINUS:
 ✅ VECTOR WITH CAPITAL POINTS:
 - If a vector uses capital points (A,B,C,...), prefix the point name with rm inside vec:
   vert` {vec{rmPB}}``vert = 14
+
+✅ UNIT VECTOR BASIS (i, j, k) RULE:
+- When unit vectors appear in component form, ALWAYS wrap each unit vector in braces
+  and write it as roman bold:
+  - `{rm bold i}`, `{rm bold j}`, `{rm bold k}`
+- Do NOT write plain `i/j/k` and do NOT omit braces.
+- Example style:
+  `{rm boldF}(x,y,z)=y ^{2} z {rm bold i}+xz {rm bold j}-3x ^{2} y ^{3} {rm bold k}`
+- Any expression containing vector/equation markers such as `rm`, `bold`, `vec`,
+  `curl`, `div`, `dint`, `CDOT` MUST be typed with `insert_equation(...)`,
+  never `insert_text(...)`.
+
+🧭 VECTOR CALCULUS / SURFACE INTEGRAL RULE:
+- For double/surface integrals, use `dint` form (NOT `int ... int ...`).
+- For triple/volume integrals, use `tint` form (NOT `int ... int ... int ...`).
+- For curl/div operators, use roman operator text:
+  - `rm curl`, `rm div`
+- For vector field F, ALWAYS use:
+  - `{rm boldF}`
+- Do NOT use `rm {bold{F}}` and do NOT use `it F`.
+- For unit normal vector n, use bold roman:
+  - `rm {bold{n}}`
+- For differentials, use italic differential notation:
+  - `it dS`, `it dV`, `it dA` (as shown in the image)
+- Keep dot product as `CDOT` and group integrand with `LEFT ( ... RIGHT )` when needed.
+- Preferred style example:
+  `dint _{S} ^{} {LEFT ( rm curl {rm boldF} RIGHT ) CDOT rm {bold{n}} it dS = pi}`
+- Triple-integral style example:
+  `tint _{V} ^{} {(x ^{2} +y ^{2} ) it dV}`
+- Avoid style like:
+  `int _{} ^{} {} int _{S} ^{} {} (curl rm F) CDOT rm ndS`
 
 ⚠️ CODE FORMAT:
 - Do NOT break insert_equation/insert_text across multiple lines.

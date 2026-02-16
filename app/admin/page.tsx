@@ -72,7 +72,7 @@ interface Payment {
     card?: { company: string; number: string };
 }
 
-const EDITABLE_PLANS = ["free", "plus", "pro"] as const;
+const EDITABLE_PLANS = ["free", "go", "plus", "pro"] as const;
 type EditablePlan = (typeof EDITABLE_PLANS)[number];
 
 export default function AdminPage() {
@@ -839,6 +839,7 @@ export default function AdminPage() {
                             >
                                 <option value="">모든 플랜</option>
                                 <option value="free">Free</option>
+                                <option value="go">Go</option>
                                 <option value="plus">Plus</option>
                                 <option value="pro">Pro</option>
                             </select>
@@ -977,6 +978,9 @@ export default function AdminPage() {
                                                             >
                                                                 <option value="free">
                                                                     Free
+                                                                </option>
+                                                                <option value="go">
+                                                                    Go
                                                                 </option>
                                                                 <option value="plus">
                                                                     Plus

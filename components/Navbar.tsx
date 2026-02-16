@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { getFirebaseAppOrNull } from "../firebaseConfig";
+import { inferPlanFromAmount } from "@/lib/userData";
 
 export function Navbar() {
     const { isAuthenticated, avatar, logout, user } = useAuth();
@@ -15,29 +16,38 @@ export function Navbar() {
         remaining: number;
     } | null>(null);
 
-    const normalizePlan = (value?: unknown): "free" | "plus" | "pro" | "test" => {
+    const normalizePlan = (
+        value?: unknown,
+    ): "free" | "go" | "plus" | "pro" | "test" => {
         if (typeof value !== "string") return "free";
         const normalized = value.trim().toLowerCase();
         if (normalized === "pro" || normalized === "ultra") return "pro";
+        if (normalized === "go") return "go";
         if (normalized === "plus" || normalized === "test") return normalized;
         return "free";
     };
 
-    const inferPlanFromOrderName = (value?: unknown): "free" | "plus" | "pro" => {
+    const inferPlanFromOrderName = (
+        value?: unknown,
+    ): "free" | "go" | "plus" | "pro" => {
         if (typeof value !== "string") return "free";
         const normalized = value.toLowerCase();
         if (normalized.includes("ultra") || normalized.includes("pro")) return "pro";
+        if (normalized.includes("go")) return "go";
         if (normalized.includes("plus")) return "plus";
         return "free";
     };
 
-    const getPlanRank = (plan: "free" | "plus" | "pro" | "test") => {
-        if (plan === "pro") return 2;
-        if (plan === "plus" || plan === "test") return 1;
+    const getPlanRank = (plan: "free" | "go" | "plus" | "pro" | "test") => {
+        if (plan === "pro") return 3;
+        if (plan === "plus" || plan === "test") return 2;
+        if (plan === "go") return 1;
         return 0;
     };
 
-    const resolvePlanFromUserData = (data: any): "free" | "plus" | "pro" | "test" => {
+    const resolvePlanFromUserData = (
+        data: any,
+    ): "free" | "go" | "plus" | "pro" | "test" => {
         const direct = normalizePlan(
             data?.subscription?.plan ?? data?.plan ?? data?.tier,
         );
@@ -45,11 +55,13 @@ export function Navbar() {
 
         const fallbackByAmount =
             typeof data?.subscription?.amount === "number"
-                ? data.subscription.amount >= 99000
-                    ? "pro"
-                    : data.subscription.amount >= 100
-                      ? "plus"
-                      : "free"
+                ? (() => {
+                      const inferred = inferPlanFromAmount(
+                          data.subscription.amount,
+                          data?.subscription?.billingCycle,
+                      );
+                      return inferred === "test" ? "plus" : inferred;
+                  })()
                 : "free";
         if (fallbackByAmount !== "free") return fallbackByAmount;
 
@@ -200,11 +212,12 @@ export function Navbar() {
 
     // Get plan display name
     const getPlanDisplayName = (plan: string | null): string => {
-        if (!plan || !planResolved) return "요금제 확인 중";
+        if (!plan || !planResolved) return "\uC694\uAE08\uC81C \uD655\uC778 \uC911";
         const planNames: Record<string, string> = {
-            pro: "Ultra 요금제",
-            plus: "Plus 요금제",
-            test: "Plus 요금제",
+            pro: "Ultra \uC694\uAE08\uC81C",
+            plus: "Plus \uC694\uAE08\uC81C",
+            go: "Go \uC694\uAE08\uC81C",
+            test: "Plus \uC694\uAE08\uC81C",
             free: "Free",
         };
         return planNames[plan] || "Free";
@@ -240,13 +253,13 @@ export function Navbar() {
 
                 <div className="nav-items">
                     <a href="/#exam-typing" className="nav-link">
-                        시험지 타이핑
+                        {"\uC2DC\uD5D8\uC9C0 \uD0C0\uC774\uD551"}
                     </a>
                     <a href="/#pricing" className="nav-link">
-                        요금제
+                        {"\uC694\uAE08\uC81C"}
                     </a>
                     <a href="/download" className="nav-download-gradient">
-                        지금 다운로드
+                        {"\uC9C0\uAE08 \uB2E4\uC6B4\uB85C\uB4DC"}
                     </a>
                 </div>
 
@@ -255,17 +268,17 @@ export function Navbar() {
                         <div className="nav-profile-menu-wrapper" ref={menuRef}>
                             <button
                                 className="nav-profile-trigger"
-                                aria-label="프로필 메뉴 열기"
+                                aria-label="\uD504\uB85C\uD544 \uBA54\uB274 \uC5F4\uAE30"
                                 onClick={() => setMenuOpen((v) => !v)}
                             >
                                 <img
                                     src={avatar || "/default-avatar.png"}
-                                    alt="프로필"
+                                    alt="\uD504\uB85C\uD544"
                                     className="nav-profile-avatar-img"
                                 />
                                 <div className="nav-profile-info">
                                     <span className="nav-profile-email">
-                                        {displayName ?? user?.email ?? "사용자"}
+                                        {displayName ?? user?.email ?? "\uC0AC\uC6A9\uC790"}
                                     </span>
                                     <span className="nav-profile-plan">
                                         {getPlanDisplayName(userPlan)}
@@ -289,7 +302,7 @@ export function Navbar() {
                             </button>
                             {menuOpen && (
                                 <div className="nav-profile-dropdown">
-                                    {/* 오늘 사용량 */}
+                                    {/* Daily usage */}
                                     {aiUsage && (
                                         <div className="nav-usage-section">
                                             <div className="nav-usage-header">
@@ -307,7 +320,7 @@ export function Navbar() {
                                                     <path d="M18 20V4" />
                                                     <path d="M6 20v-4" />
                                                 </svg>
-                                                <span>오늘 사용량</span>
+                                                <span>{"\uC624\uB298 \uC0AC\uC6A9\uB7C9"}</span>
                                             </div>
                                             <div className="nav-usage-bar-bg">
                                                 <div
@@ -329,7 +342,7 @@ export function Navbar() {
                                             </div>
                                             <div className="nav-usage-info">
                                                 <span className="nav-usage-remaining">
-                                                    남은 횟수:{" "}
+                                                    {"\uB0A8\uC740 \uD69F\uC218: "}
                                                     <strong>
                                                         {aiUsage.remaining}
                                                     </strong>
@@ -361,7 +374,7 @@ export function Navbar() {
                                             <circle cx="12" cy="8" r="4" />
                                             <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
                                         </svg>
-                                        <span>프로필</span>
+                                        <span>{"\uD504\uB85C\uD544"}</span>
                                     </a>
                                     <a
                                         href="/profile"
@@ -397,7 +410,7 @@ export function Navbar() {
                                                 y2="10"
                                             />
                                         </svg>
-                                        <span>요금제</span>
+                                        <span>{"\uC694\uAE08\uC81C"}</span>
                                     </a>
                                     <a
                                         href="/profile"
@@ -421,7 +434,7 @@ export function Navbar() {
                                         >
                                             <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                                         </svg>
-                                        <span>결제내역</span>
+                                        <span>{"\uACB0\uC81C\uB0B4\uC5ED"}</span>
                                     </a>
                                     <div className="nav-profile-dropdown-divider"></div>
                                     <button
@@ -450,18 +463,18 @@ export function Navbar() {
                                                 y2="12"
                                             />
                                         </svg>
-                                        <span>로그아웃</span>
+                                        <span>{"\uB85C\uADF8\uC544\uC6C3"}</span>
                                     </button>
                                 </div>
                             )}
                         </div>
                     ) : (
                         <>
-                            <a href="/login" className="nav-login-btn">
-                                로그인
+                            <a href="/login?mode=signup" className="nav-download-btn">
+                                {"\uD68C\uC6D0\uAC00\uC785"}
                             </a>
-                            <a href="/download" className="nav-download-btn">
-                                다운로드
+                            <a href="/login" className="nav-login-btn">
+                                {"\uB85C\uADF8\uC778"}
                             </a>
                         </>
                     )}

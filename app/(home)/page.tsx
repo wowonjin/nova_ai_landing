@@ -12,7 +12,6 @@ import { useAuth } from "@/context/AuthContext";
 import Home from "../../components/Home";
 import ExamTyping from "../../components/ExamTyping";
 import GeminiAI from "../../components/GeminiAI";
-import Reviews from "../../components/Reviews";
 import CostComparison from "../../components/CostComparison";
 import Pricing from "../../components/Pricing";
 import FAQ from "../../components/FAQ";
@@ -135,7 +134,6 @@ function FormuLiteContent() {
             <Home />
             <ExamTyping />
             <GeminiAI />
-            <Reviews />
             <CostComparison />
             <Pricing />
             <FAQ />

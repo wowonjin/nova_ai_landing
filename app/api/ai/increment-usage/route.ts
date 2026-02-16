@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         const result = await db.runTransaction(async (tx) => {
             const userDoc = await tx.get(userRef);
             const nowIso = new Date().toISOString();
-            let plan: "free" | "plus" | "pro" = "free";
+            let plan: "free" | "go" | "plus" | "pro" = "free";
             let inferredResetAt: string | undefined;
             let userData: Record<string, any> = {};
 

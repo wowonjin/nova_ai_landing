@@ -7,6 +7,7 @@ function normalizePlan(value: unknown): PlanTier {
     if (typeof value !== "string") return "free";
     const normalized = value.trim().toLowerCase();
     if (normalized === "pro" || normalized === "ultra") return "pro";
+    if (normalized === "go") return "go";
     if (normalized === "plus") return "plus";
     if (normalized === "test") return "plus";
     return "free";
@@ -29,6 +30,10 @@ export function resolveEffectiveUsagePlan(userData: PlainObject): PlanTier {
         return "plus";
     }
 
+    if (rootPlan === "go" || subscriptionPlan === "go" || tierPlan === "go") {
+        return "go";
+    }
+
     const amountRaw = userData.subscription?.amount;
     const amount =
         typeof amountRaw === "number"
@@ -41,11 +46,13 @@ export function resolveEffectiveUsagePlan(userData: PlainObject): PlanTier {
         const inferred = inferPlanFromAmount(amount, userData.subscription?.billingCycle);
         if (inferred === "pro") return "pro";
         if (inferred === "plus" || inferred === "test") return "plus";
+        if (inferred === "go") return "go";
     }
 
     const orderName = String(userData.subscription?.orderName || "").toLowerCase();
     if (orderName.includes("ultra") || orderName.includes("pro")) return "pro";
     if (orderName.includes("plus")) return "plus";
+    if (orderName.includes("go")) return "go";
 
     return "free";
 }
@@ -116,6 +123,7 @@ export function inferPaidPlanFromPayment(payment: {
         const inferred = inferPlanFromAmount(amountValue, "monthly");
         if (inferred === "pro") return "pro";
         if (inferred === "plus" || inferred === "test") return "plus";
+        if (inferred === "go") return "go";
     }
 
     const normalizedOrderName = String(payment.orderName || "").toLowerCase();
@@ -123,5 +131,6 @@ export function inferPaidPlanFromPayment(payment: {
         return "pro";
     }
     if (normalizedOrderName.includes("plus")) return "plus";
+    if (normalizedOrderName.includes("go")) return "go";
     return "free";
 }

@@ -1422,6 +1422,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             plan:
                                 (sanitized.plan as
                                     | "free"
+                                    | "go"
                                     | "plus"
                                     | "pro"
                                     | "test"
@@ -1457,6 +1458,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             plan:
                                 (sanitized.plan as
                                     | "free"
+                                    | "go"
                                     | "plus"
                                     | "pro"
                                     | "test"

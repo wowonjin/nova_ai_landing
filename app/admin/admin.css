@@ -230,6 +230,11 @@
     color: #d97706;
 }
 
+.admin-plan-badge.go {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
 .admin-plan-badge.pro {
     background: #ede9fe;
     color: #7c3aed;

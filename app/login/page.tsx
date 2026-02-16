@@ -94,6 +94,12 @@ function LoginContent() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     useEffect(() => {
+        const mode = searchParams?.get("mode");
+        const signup = searchParams?.get("signup");
+        setSignupMode(mode === "signup" || signup === "1");
+    }, [searchParams]);
+
+    useEffect(() => {
         const diagnostics = getFirebaseClientConfigDiagnostics();
         if (diagnostics.configured) return;
         setError(

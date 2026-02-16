@@ -7,8 +7,12 @@ from typing import Literal, Optional, Tuple
 
 def _debug(msg: str) -> None:
     if sys.stderr is not None:
-        sys.stderr.write(f"[Layout Debug] {msg}\n")
-        sys.stderr.flush()
+        try:
+            sys.stderr.write(f"[Layout Debug] {msg}\n")
+            sys.stderr.flush()
+        except Exception:
+            # Windowed executables may not have a writable stderr handle.
+            pass
 
 
 ContainerTemplate = Literal["header.hwp", "box.hwp", "box_white.hwp"]

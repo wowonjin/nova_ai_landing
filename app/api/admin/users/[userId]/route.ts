@@ -6,7 +6,7 @@ import { getTierLimit } from "@/lib/tierLimits";
 import { resolveEffectiveUsagePlan } from "@/lib/aiUsage";
 
 const db = admin.firestore();
-const ALLOWED_PLANS = ["free", "plus", "pro"] as const;
+const ALLOWED_PLANS = ["free", "go", "plus", "pro"] as const;
 type EditablePlan = (typeof ALLOWED_PLANS)[number];
 
 function isEditablePlan(value: unknown): value is EditablePlan {
@@ -19,7 +19,7 @@ function isEditablePlan(value: unknown): value is EditablePlan {
 /**
  * PATCH /api/admin/users/[userId]
  * Updates user's plan and/or remaining AI usage for current cycle/day.
- * Body: { remainingUsage?: number, plan?: "free" | "plus" | "pro" }
+ * Body: { remainingUsage?: number, plan?: "free" | "go" | "plus" | "pro" }
  */
 export async function PATCH(
     request: NextRequest,
@@ -60,7 +60,7 @@ export async function PATCH(
         if (hasPlan) {
             if (!isEditablePlan(body.plan)) {
                 return NextResponse.json(
-                    { error: "plan must be one of: free, plus, pro" },
+                    { error: "plan must be one of: free, go, plus, pro" },
                     { status: 400 },
                 );
             }

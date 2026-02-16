@@ -44,6 +44,7 @@ function getEmptyStats() {
         },
         planCounts: {
             free: 0,
+            go: 0,
             plus: 0,
             pro: 0,
         },
@@ -102,6 +103,7 @@ export async function GET(request: NextRequest) {
 
         const planCounts: Record<string, number> = {
             free: 0,
+            go: 0,
             plus: 0,
             pro: 0,
         };

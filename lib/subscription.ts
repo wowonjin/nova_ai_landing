@@ -13,7 +13,7 @@ function getDb() {
 }
 
 export interface SubscriptionData {
-    plan: "free" | "plus" | "pro" | "test";
+    plan: "free" | "go" | "plus" | "pro" | "test";
     billingKey?: string;
     customerKey?: string;
     /** true for recurring subscriptions */
@@ -135,7 +135,7 @@ export async function getSubscription(userId: string) {
 // Update user plan
 export async function updateUserPlan(
     userId: string,
-    plan: "free" | "plus" | "pro",
+    plan: "free" | "go" | "plus" | "pro",
 ) {
     try {
         const db = getDb();

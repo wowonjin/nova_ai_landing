@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         const { plan, billingCycle } = body;
 
         // Validate plan
-        const validPlans = ["free", "plus", "pro"];
+        const validPlans = ["free", "go", "plus", "pro"];
         if (!plan || !validPlans.includes(plan)) {
             return NextResponse.json(
                 { error: "Invalid plan" },
@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
         const planAmounts: Record<string, { monthly: number; yearly: number }> =
             {
                 free: { monthly: 0, yearly: 0 },
+                go: { monthly: 11900, yearly: 99960 },
                 plus: { monthly: 29900, yearly: 251160 },
                 pro: { monthly: 99000, yearly: 831600 },
             };
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
         // Plan display names for orderName
         const planNames: Record<string, string> = {
             free: "Free",
+            go: "Go",
             plus: "Plus",
             pro: "Ultra",
         };
@@ -143,7 +145,7 @@ export async function POST(request: NextRequest) {
             buildUserRootPatch({
                 existingUser: (userDoc.data() || {}) as Record<string, unknown>,
                 subscription: updatedSubscription as Record<string, unknown>,
-                plan: plan as "free" | "plus" | "pro",
+                plan: plan as "free" | "go" | "plus" | "pro",
             }),
             { merge: true },
         );

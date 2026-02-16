@@ -158,8 +158,12 @@ class AIWorker(QThread):
         import sys
         def _log(msg: str) -> None:
             if sys.stderr is not None:
-                sys.stderr.write(f"[GUI Debug] {msg}\n")
-                sys.stderr.flush()
+                try:
+                    sys.stderr.write(f"[GUI Debug] {msg}\n")
+                    sys.stderr.flush()
+                except Exception:
+                    # In windowed PyInstaller builds, stderr can be an invalid handle.
+                    pass
         
         try:
             total = len(self._image_paths)
@@ -2408,14 +2412,22 @@ class NovaAILiteWindow(QWidget):
 
     def _on_typing_cancelled(self) -> None:
         # Stop auto-type chain, keep generated code for manual re-run.
+        pending_idx = self._auto_type_pending_idx
         self._auto_type_after_ai = False
         self._auto_type_pending_idx = None
+        if pending_idx is not None and 0 <= pending_idx < len(self._gen_statuses):
+            self._gen_statuses[pending_idx] = "\uCDE8\uC18C\uB428"
+            self._render_order_list()
         self._set_typing_status("")
         QMessageBox.information(self, "\uC54C\uB9BC", "\uD0C0\uC774\uD551\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.")
 
     def _on_typing_error(self, message: str) -> None:
+        pending_idx = self._auto_type_pending_idx
         self._auto_type_after_ai = False
         self._auto_type_pending_idx = None
+        if pending_idx is not None and 0 <= pending_idx < len(self._gen_statuses):
+            self._gen_statuses[pending_idx] = f"\uC624\uB958({message})"
+            self._render_order_list()
         self._set_typing_status("")
         QMessageBox.critical(self, "\uD0C0\uC774\uD551 \uC624\uB958", message)
 
@@ -2869,27 +2881,27 @@ class TypingWorker(QThread):
                     self.cancelled.emit()
                     return
 
-                resolved_target = (
-                    target_filename
-                    or HwpController.get_foreground_document_name()
-                )
-                if not resolved_target:
-                    self.error.emit(
-                        "??? ?????? ???? ??????? ??????? "
-                        "??????????? ??????????????? ????? ????????"
-                    )
-                    return
-                if controller is None:
-                    controller = HwpController()
-                    controller.connect()
-                    controller.activate_target_window(resolved_target)
-                    runner = ScriptRunner(controller)
-                else:
-                    # Always refresh the active document before typing.
-                    controller.activate_target_window(resolved_target)
-
-                self.item_started.emit(idx)
                 try:
+                    resolved_target = (
+                        target_filename
+                        or HwpController.get_foreground_document_name()
+                    )
+                    if not resolved_target:
+                        self.error.emit(
+                            "활성 한글 문서를 찾지 못했습니다. "
+                            "타이핑할 문서를 선택한 뒤 다시 시도해주세요."
+                        )
+                        return
+                    if controller is None:
+                        controller = HwpController()
+                        controller.connect()
+                        controller.activate_target_window(resolved_target)
+                        runner = ScriptRunner(controller)
+                    else:
+                        # Always refresh the active document before typing.
+                        controller.activate_target_window(resolved_target)
+
+                    self.item_started.emit(idx)
                     assert runner is not None
                     runner.run(script, cancel_check=self._cancel.is_set, source_image_path=source_image_path)
                 except ScriptCancelled:

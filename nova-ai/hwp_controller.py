@@ -88,6 +88,55 @@ class HwpController:
                 return m2.group(1).strip()
         return ""
 
+    @staticmethod
+    def get_foreground_document_name() -> str:
+        """
+        Return the filename/title of the currently focused HWP window.
+        Falls back to last detected/current filename when needed.
+        """
+        if not IS_WINDOWS:
+            return ""
+        try:
+            import win32gui  # type: ignore
+
+            hwnd = win32gui.GetForegroundWindow()
+            if not hwnd:
+                return HwpController.get_last_detected_filename() or HwpController.get_current_filename()
+
+            title = (win32gui.GetWindowText(hwnd) or "").strip()
+            class_name = ""
+            try:
+                class_name = (win32gui.GetClassName(hwnd) or "").strip()
+            except Exception:
+                class_name = ""
+
+            is_hwp = (
+                bool(re.search(r"\.hwp[x]?\b", title, re.IGNORECASE))
+                or "한글" in title
+                or "HWP" in title
+                or "Hwp" in title
+                or "HwpFrame" in class_name
+            )
+            if not is_hwp:
+                return HwpController.get_last_detected_filename() or ""
+
+            m = re.search(r"([^\\/\-]+\.hwp[x]?)", title, re.IGNORECASE)
+            if m:
+                return m.group(1).strip()
+
+            # Fallback for unsaved docs like "빈 문서1 - 한글"
+            m2 = re.search(r"^\s*(.*?)\s*-\s*(한글|HWP|Hwp)\s*$", title)
+            if m2:
+                return m2.group(1).strip()
+
+            if title:
+                # Drop trailing path hint blocks when present.
+                simple = title.split("[", 1)[0].strip()
+                return simple or title
+        except Exception:
+            pass
+        return HwpController.get_last_detected_filename() or HwpController.get_current_filename()
+
     _uia_instance: Any = None
     _uia_walker: Any = None
     _last_detected_filename: str = ""
@@ -374,13 +423,42 @@ class HwpController:
         if not text:
             return
         hwp = self._ensure_connected()
+        last_exc: Exception | None = None
         try:
             hwp.HAction.GetDefault("InsertText", hwp.HParameterSet.HInsertText.HSet)
             hwp.HParameterSet.HInsertText.Text = text
             hwp.HAction.Execute("InsertText", hwp.HParameterSet.HInsertText.HSet)
-        except Exception:
-            for char in text:
-                hwp.KeyIndicator(ord(char), 1)
+            return
+        except Exception as exc:
+            last_exc = exc
+
+        # Fallback 1: COM CreateAction path (works on some HWP builds where
+        # HParameterSet.HInsertText is unavailable or behaves differently).
+        try:
+            action = hwp.CreateAction("InsertText")
+            param = action.CreateSet()
+            action.GetDefault(param)
+            try:
+                param.SetItem("Text", text)
+            except Exception:
+                setattr(param, "Text", text)
+            action.Execute(param)
+            return
+        except Exception as exc:
+            last_exc = exc
+
+        # Fallback 2: pyhwpx helper methods (wrapper API differences by version).
+        for method_name in ("insert_text", "InsertText"):
+            method = getattr(hwp, method_name, None)
+            if not callable(method):
+                continue
+            try:
+                method(text)
+                return
+            except Exception as exc:
+                last_exc = exc
+
+        raise HwpControllerError(f"텍스트 입력 실패: {last_exc or '원인 미상'}")
 
     def _set_paragraph_align(self, align: str) -> None:
         try:

@@ -15,6 +15,7 @@ import "../../mobile.css";
 // import { saveSubscription } from "@/lib/subscription";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { app as firebaseApp } from "../../../firebaseConfig";
+import { inferPlanFromAmount } from "@/lib/userData";
 
 /* -------------------- Loading -------------------- */
 function Loading() {
@@ -334,12 +335,17 @@ function PaymentSuccessContent() {
                         const total = Number(
                             toss?.totalAmount ?? toss?.amount ?? 0,
                         );
+                        const inferredPlan = inferPlanFromAmount(
+                            total,
+                            billingCycle,
+                        );
                         const plan =
-                            total >= 99000
-                                ? "pro"
-                                : total >= 100
-                                  ? "plus"
-                                  : null;
+                            inferredPlan === "go" ||
+                            inferredPlan === "plus" ||
+                            inferredPlan === "pro" ||
+                            inferredPlan === "test"
+                                ? inferredPlan
+                                : null;
                         const customerKey = toss?.customerKey || null;
 
                         let targetUserId = resolvedUserId;

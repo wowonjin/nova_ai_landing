@@ -177,8 +177,9 @@ const plansData: PlanData[] = [
 function getTierOrder(planId: string): number {
     const tierOrder: { [key: string]: number } = {
         free: 0,
-        plus: 1,
-        pro: 2,
+        go: 1,
+        plus: 2,
+        pro: 3,
     };
     return tierOrder[planId] ?? 0;
 }
@@ -192,6 +193,7 @@ function getCtaText(planId: string, currentPlanId: string): string {
         // Downgrade
         const planNames: { [key: string]: string } = {
             free: "Free로",
+            go: "Go 요금제로",
             plus: "Plus 요금제로",
             pro: "Ultra 요금제로",
         };
@@ -200,6 +202,7 @@ function getCtaText(planId: string, currentPlanId: string): string {
         // Upgrade
         const planNames: { [key: string]: string } = {
             free: "Free로",
+            go: "Go 요금제로",
             plus: "Plus 요금제로",
             pro: "Ultra 요금제로",
         };
@@ -294,6 +297,7 @@ function ProfileContent() {
             const getLimitByPlan = (rawPlan: unknown) => {
                 const plan = String(rawPlan || "free").toLowerCase();
                 if (plan === "pro" || plan === "ultra") return 2200;
+                if (plan === "go") return 132;
                 if (plan === "plus" || plan === "test") return 330;
                 return 5;
             };
@@ -469,7 +473,7 @@ function ProfileContent() {
     // Map plan id to icon component
     const getPlanIcon = (planId?: string) => {
         if (planId === "pro") return <CrownIcon />;
-        if (planId === "plus") return <ZapIcon />;
+        if (planId === "plus" || planId === "go") return <ZapIcon />;
         return <SparklesIcon />;
     };
 
@@ -480,6 +484,10 @@ function ProfileContent() {
             pro: {
                 name: "Ultra 요금제",
                 description: "모든 프리미엄 기능을 이용 중입니다",
+            },
+            go: {
+                name: "Go 요금제",
+                description: "핵심 기능을 합리적인 가격으로 이용 중입니다",
             },
             plus: {
                 name: "Plus 요금제",
@@ -493,18 +501,24 @@ function ProfileContent() {
         return planMap[plan] || planMap.free;
     };
 
-    const normalizePlan = (value?: unknown): "free" | "plus" | "pro" | "test" => {
+    const normalizePlan = (
+        value?: unknown,
+    ): "free" | "go" | "plus" | "pro" | "test" => {
         if (typeof value !== "string") return "free";
         const normalized = value.trim().toLowerCase();
         if (normalized === "pro" || normalized === "ultra") return "pro";
+        if (normalized === "go") return "go";
         if (normalized === "plus" || normalized === "test") return normalized;
         return "free";
     };
 
-    const inferPlanFromOrderName = (orderName?: unknown): "free" | "plus" | "pro" => {
+    const inferPlanFromOrderName = (
+        orderName?: unknown,
+    ): "free" | "go" | "plus" | "pro" => {
         if (typeof orderName !== "string") return "free";
         const normalized = orderName.toLowerCase();
         if (normalized.includes("ultra") || normalized.includes("pro")) return "pro";
+        if (normalized.includes("go")) return "go";
         if (normalized.includes("plus")) return "plus";
         return "free";
     };
@@ -588,6 +602,7 @@ function ProfileContent() {
     const fallbackLimitByPlan = (planId: string) => {
         const normalized = planId.toLowerCase();
         if (normalized === "pro" || normalized === "ultra") return 2200;
+        if (normalized === "go") return 132;
         if (normalized === "plus" || normalized === "test") return 330;
         return 5;
     };
@@ -683,6 +698,7 @@ function ProfileContent() {
         try {
             // 결제 페이지로 리다이렉트 (단건 결제)
             const planNameMap: Record<string, string> = {
+                go: "Go",
                 plus: "Plus",
                 pro: "Ultra",
             };
